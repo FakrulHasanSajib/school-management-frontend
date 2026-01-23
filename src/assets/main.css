@@ -1,0 +1,49 @@
+@import './base.css';
+
+/* গ্লোবাল রিসেট */
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f4f6f9; /* আপনার অ্যাপের ব্যাকগ্রাউন্ড কালার */
+  overflow-x: hidden;
+}
+
+/* এটি সব পেজের জন্য কমন কন্টেইনার */
+.responsive-container {
+  width: 100%;
+  max-width: 1200px; /* বড় স্ক্রিনে এর বেশি চওড়া হবে না */
+  margin: 0 auto; /* মাঝখানে থাকবে */
+  padding: 0 15px; /* ডানে বামে একটু গ্যাপ থাকবে */
+  box-sizing: border-box;
+}
+
+/* মোবাইল ডিভাইসের জন্য (৭৬৮ পিক্সেলের নিচে) */
+@media (max-width: 768px) {
+  .responsive-container {
+    padding: 0 10px; /* মোবাইলে প্যাডিং একটু কম */
+  }
+}
+
+#app {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  display: block; /* গ্রিড বা ফ্লেক্স সরাতে হবে */
+}
+
+/* লিঙ্ক বা বাটনের স্টাইল (ঐচ্ছিক, চাইলে রাখতে পারেন) */
+a,
+.green {
+  text-decoration: none;
+  color: hsla(160, 100%, 37%, 1);
+  transition: 0.4s;
+}
+
+@media (hover: hover) {
+  a:hover {
+    background-color: hsla(160, 100%, 37%, 0.2);
+  }
+}

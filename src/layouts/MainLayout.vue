@@ -36,7 +36,7 @@ const handleLogout = () => {
           <RouterLink to="/admin/academic/subjects" class="nav-item" active-class="active">
             <span class="icon">📚</span> Add Subject
           </RouterLink>
-          <RouterLink to="/admin/routines/create" class="nav-item" active-class="active">
+          <RouterLink to="/admin/routines" class="nav-item" active-class="active">
             <span class="icon">📅</span> Class Routine
           </RouterLink>
 

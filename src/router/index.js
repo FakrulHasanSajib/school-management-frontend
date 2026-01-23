@@ -13,6 +13,7 @@ import TeacherProfileView from '@/views/TeacherProfileView.vue'
 
 import RoutineCreateView from '@/views/RoutineCreateView.vue'
 import SubjectCreateView from '@/views/SubjectCreateView.vue'
+import RoutineListView from '@/views/RoutineListView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -79,6 +80,11 @@ const router = createRouter({
           path: '/admin/academic/subjects',
           name: 'academic.subjects',
           component: () => import('../views/SubjectCreateView.vue'),
+        },
+        {
+          path: '/admin/routines', // লিস্ট দেখার রাউট
+          name: 'routines.index',
+          component: () => import('../views/RoutineListView.vue'),
         },
       ],
     },

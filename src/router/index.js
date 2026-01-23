@@ -14,6 +14,8 @@ import TeacherProfileView from '@/views/TeacherProfileView.vue'
 import RoutineCreateView from '@/views/RoutineCreateView.vue'
 import SubjectCreateView from '@/views/SubjectCreateView.vue'
 import RoutineListView from '@/views/RoutineListView.vue'
+import RoutineEdit from '@/views/RoutineEdit.vue'
+import StudentIdCard from '@/views/StudentIdCard.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -85,6 +87,17 @@ const router = createRouter({
           path: '/admin/routines', // লিস্ট দেখার রাউট
           name: 'routines.index',
           component: () => import('../views/RoutineListView.vue'),
+        },
+        {
+          path: '/admin/routines/edit/:id',
+          name: 'RoutineEdit',
+          component: RoutineEdit,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/admin/students/id-card/:id',
+          name: 'StudentIdCard',
+          component: StudentIdCard,
         },
       ],
     },

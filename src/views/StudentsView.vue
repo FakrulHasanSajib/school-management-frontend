@@ -9,12 +9,12 @@ const classes = ref([])
 const sections = ref([])
 const isLoading = ref(true)
 
-// সার্চ এবং ফিল্টারের জন্য রিঅ্যাক্টিভ ভেরিয়েবল
+// সার্চ এবং ফিল্টার ভেরিয়েবল
 const searchQuery = ref('')
 const selectedClass = ref('')
 const selectedSection = ref('')
 
-// ১. স্টুডেন্ট লিস্ট লোড করার ফাংশন
+// ১. স্টুডেন্ট লিস্ট লোড
 const fetchStudents = async () => {
   isLoading.value = true
   try {
@@ -33,7 +33,7 @@ const fetchStudents = async () => {
   }
 }
 
-// ২. ফিল্টারের জন্য একাডেমিক ডাটা লোড করা
+// ২. ফিল্টার অপশন লোড
 const fetchFilters = async () => {
   try {
     const classRes = await axios.get('http://127.0.0.1:8000/api/academic/classes')
@@ -45,7 +45,7 @@ const fetchFilters = async () => {
   }
 }
 
-// ✅ প্রফেশনাল রিসেট ফাংশন (যাতে টেমপ্লেটে এরর না আসে)
+// ৩. রিসেট ফিল্টার
 const resetFilters = () => {
   searchQuery.value = ''
   selectedClass.value = ''
@@ -53,7 +53,7 @@ const resetFilters = () => {
   fetchStudents()
 }
 
-// ৩. সার্চ বা ফিল্টার চেঞ্জ হলে অটোমেটিক ডাটা রিফ্রেশ হবে
+// ৪. ওয়াচার
 watch([searchQuery, selectedClass, selectedSection], () => {
   fetchStudents()
 })
@@ -63,12 +63,13 @@ onMounted(() => {
   fetchFilters()
 })
 
+// ৫. ডিলিট ফাংশন
 const deleteStudent = async (id) => {
   if (!confirm('আপনি কি নিশ্চিত যে এই স্টুডেন্টকে ডিলিট করতে চান?')) return
   try {
     await axios.delete(`http://127.0.0.1:8000/api/students/${id}`)
     alert('স্টুডেন্ট ডিলিট করা হয়েছে!')
-    fetchStudents()
+    fetchStudents() // রিফ্রেশ
   } catch (error) {
     alert('ডিলিট করা সম্ভব হয়নি!')
   }
@@ -109,55 +110,83 @@ const deleteStudent = async (id) => {
     </div>
 
     <div v-else class="table-card">
-      <table class="custom-table">
-        <thead>
-          <tr>
-            <th>অ্যাডমিশন নং</th>
-            <th>নাম</th>
-            <th>ইমেইল</th>
-            <th>ক্লাস (সেকশন)</th>
-            <th>অ্যাকশন</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="student in students" :key="student.id">
-            <td style="font-weight: bold">{{ student.admission_no }}</td>
-            <td>
-              <div
-                class="user-info"
-                @click="router.push(`/admin/students/view/${student.id}`)"
-                style="cursor: pointer"
-              >
-                <div class="avatar">{{ student.name ? student.name.charAt(0) : 'S' }}</div>
-                <span class="user-name" style="color: #3b82f6; font-weight: bold">
-                  {{ student.name }}
-                </span>
-              </div>
-            </td>
-            <td>{{ student.email }}</td>
-            <td>
-              <span class="badge"> {{ student.class }} ({{ student.section }}) </span>
-            </td>
-            <td>
-              <button
-                @click="router.push(`/admin/students/edit/${student.id}`)"
-                class="action-btn edit"
-              >
-                Edit
-              </button>
-              <button @click="deleteStudent(student.id)" class="action-btn delete">Delete</button>
-            </td>
-          </tr>
-          <tr v-if="students.length === 0">
-            <td colspan="5" class="empty-state">কোনো স্টুডেন্ট পাওয়া যায়নি!</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>অ্যাডমিশন নং</th>
+              <th>নাম</th>
+              <th>ফোন</th>
+              <th>রক্তের গ্রুপ</th>
+              <th>ক্লাস (সেকশন)</th>
+              <th>অ্যাকশন</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="student in students" :key="student.id">
+              <td style="font-weight: bold; color: #64748b">{{ student.admission_no }}</td>
+
+              <td>
+                <div
+                  class="user-info"
+                  @click="router.push(`/admin/students/view/${student.id}`)"
+                  style="cursor: pointer; display: flex; align-items: center; gap: 10px"
+                >
+                  <img v-if="student.image" :src="student.image" class="avatar-img" alt="Img" />
+                  <div v-else class="avatar">{{ student.name ? student.name.charAt(0) : 'S' }}</div>
+
+                  <span class="user-name" style="color: #3b82f6; font-weight: bold">
+                    {{ student.name }}
+                  </span>
+                </div>
+              </td>
+
+              <td>{{ student.phone || 'N/A' }}</td>
+
+              <td>
+                <span v-if="student.blood_group" class="blood-badge">{{
+                  student.blood_group
+                }}</span>
+                <span v-else style="color: #94a3b8">-</span>
+              </td>
+
+              <td>
+                <span class="badge"> {{ student.class }} ({{ student.section }}) </span>
+              </td>
+
+              <td>
+                <div class="action-buttons">
+                  <button
+                    @click="router.push(`/admin/students/edit/${student.id}`)"
+                    class="action-btn edit"
+                  >
+                    Edit
+                  </button>
+                  <button @click="deleteStudent(student.id)" class="action-btn delete">
+                    Delete
+                  </button>
+                  <button
+                    @click="router.push(`/admin/students/id-card/${student.id}`)"
+                    class="action-btn id-card-btn"
+                    title="Generate ID Card"
+                  >
+                    🆔 ID
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="students.length === 0">
+              <td colspan="6" class="empty-state">কোনো স্টুডেন্ট পাওয়া যায়নি!</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* স্টাইল (হুবহু আগের মতোই) */
 .search-filter-container {
   display: flex;
   justify-content: space-between;
@@ -167,6 +196,7 @@ const deleteStudent = async (id) => {
   border-radius: 12px;
   margin-bottom: 20px;
   border: 1px solid #f1f5f9;
+  flex-wrap: wrap;
 }
 .search-input {
   flex: 1;
@@ -174,10 +204,12 @@ const deleteStudent = async (id) => {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   outline: none;
+  min-width: 200px;
 }
 .filters {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 .filter-select {
   padding: 10px;
@@ -213,6 +245,7 @@ const deleteStudent = async (id) => {
   cursor: pointer;
   font-weight: 600;
 }
+
 .table-card {
   background: white;
   border-radius: 12px;
@@ -220,10 +253,14 @@ const deleteStudent = async (id) => {
   border: 1px solid #f1f5f9;
   overflow: hidden;
 }
+.table-responsive {
+  overflow-x: auto;
+}
 .custom-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  min-width: 800px;
 }
 .custom-table th {
   background-color: #f8fafc;
@@ -231,12 +268,16 @@ const deleteStudent = async (id) => {
   font-weight: 600;
   color: #64748b;
   border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
 }
 .custom-table td {
   padding: 1rem;
   border-bottom: 1px solid #f1f5f9;
   color: #334155;
+  vertical-align: middle;
 }
+
+/* Avatar Style */
 .avatar {
   width: 36px;
   height: 36px;
@@ -247,7 +288,18 @@ const deleteStudent = async (id) => {
   align-items: center;
   justify-content: center;
   font-weight: bold;
+  flex-shrink: 0;
 }
+.avatar-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+/* Badges */
 .badge {
   background-color: #f0fdf4;
   color: #166534;
@@ -255,25 +307,53 @@ const deleteStudent = async (id) => {
   border-radius: 20px;
   font-size: 0.8rem;
   font-weight: 600;
+  white-space: nowrap;
+}
+.blood-badge {
+  background-color: #fee2e2;
+  color: #ef4444;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 0.85rem;
+}
+
+/* Actions */
+.action-buttons {
+  display: flex;
+  gap: 8px;
 }
 .action-btn {
   border: none;
   padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
-  margin-right: 8px;
+  font-size: 0.85rem;
 }
 .edit {
   background-color: #eff6ff;
   color: #3b82f6;
 }
+.edit:hover {
+  background-color: #dbeafe;
+}
 .delete {
   background-color: #fef2f2;
   color: #ef4444;
 }
+.delete:hover {
+  background-color: #fee2e2;
+}
+
 .empty-state {
   text-align: center;
   padding: 3rem !important;
   color: #94a3b8;
+}
+.loading-state {
+  text-align: center;
+  padding: 40px;
+  color: #64748b;
+  font-size: 1.1rem;
 }
 </style>

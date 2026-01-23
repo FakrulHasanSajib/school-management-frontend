@@ -37,10 +37,11 @@ onMounted(() => {
 
     <div v-else-if="student" class="profile-card">
       <div class="profile-header">
-        <div class="avatar-big">{{ student.name.charAt(0) }}</div>
+        <img v-if="student.image" :src="student.image" class="profile-img" alt="Student Photo" />
+        <div v-else class="avatar-big">{{ student.name.charAt(0) }}</div>
+
         <div class="user-meta">
           <h3>{{ student.name }}</h3>
-          <p class="role-badge">ID: {{ student.id }}</p>
         </div>
       </div>
 
@@ -76,6 +77,14 @@ onMounted(() => {
         <div class="detail-item full">
           <label>বর্তমান ঠিকানা:</label>
           <span>{{ student.address }}</span>
+        </div>
+        <div class="detail-item">
+          <label>ফোন নম্বর:</label>
+          <span>{{ student.phone || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <label>রক্তের গ্রুপ:</label>
+          <span class="blood-badge">{{ student.blood_group || 'N/A' }}</span>
         </div>
       </div>
 
@@ -190,5 +199,19 @@ onMounted(() => {
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
+  .profile-img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #e2e8f0;
+  }
+  .blood-badge {
+    color: #dc2626;
+    font-weight: bold;
+    background: #fee2e2;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
 }
 </style>

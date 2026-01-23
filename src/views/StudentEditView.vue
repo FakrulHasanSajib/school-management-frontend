@@ -2,13 +2,18 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useRouter, useRoute } from 'vue-router'
+import Swal from 'sweetalert2' // ✅ SweetAlert2 ইম্পোর্ট
 
 const router = useRouter()
-const route = useRoute() // URL থেকে ID নেওয়ার জন্য
+const route = useRoute()
 const isLoading = ref(false)
 const errors = ref({})
 
-// ফর্ম ডাটা
+// ড্রপডাউন ডাটা
+const classes = ref([])
+const sections = ref([])
+const imagePreview = ref(null)
+
 const form = ref({
   name: '',
   email: '',
@@ -19,71 +24,145 @@ const form = ref({
   gender: 'Male',
   dob: '',
   address: '',
+  phone: '',
+  blood_group: '',
+  image: null,
 })
 
-// ডামি ক্লাস ও সেকশন (API থাকলে সেখান থেকে আনা উচিত)
-const classes = ref([
-  { id: 1, name: 'Class Ten' },
-  { id: 2, name: 'Class Nine' },
-])
-const sections = ref([
-  { id: 1, name: 'Section A' },
-  { id: 2, name: 'Section B' },
-])
+// ✅ টোস্ট কনফিগারেশন (সুন্দর মেসেজের জন্য)
+const Toast = Swal.mixin({
+  toast: true,
+  position: 'top-end',
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+  didOpen: (toast) => {
+    toast.addEventListener('mouseenter', Swal.stopTimer)
+    toast.addEventListener('mouseleave', Swal.resumeTimer)
+  },
+})
 
-// ১. পেজ লোড হলে ডাটা নিয়ে আসা
+// ১. একাডেমিক ডাটা লোড (ক্লাস)
+const fetchAcademicData = async () => {
+  try {
+    const classRes = await axios.get('http://127.0.0.1:8000/api/academic/classes')
+    classes.value = classRes.data.data
+  } catch (error) {
+    console.error('ক্লাস লোড সমস্যা:', error)
+  }
+}
+
+// ২. ক্লাস চেঞ্জ হলে সেকশন লোড
+const handleClassChange = async (classId) => {
+  sections.value = []
+  if (!classId) return
+  try {
+    const res = await axios.get(`http://127.0.0.1:8000/api/academic/classes/${classId}/sections`)
+    sections.value = res.data.data
+  } catch (error) {
+    console.error('সেকশন লোড সমস্যা', error)
+  }
+}
+
+// ৩. স্টুডেন্ট ডাটা লোড
 const fetchStudentData = async () => {
   try {
     const studentId = route.params.id
     const response = await axios.get(`http://127.0.0.1:8000/api/students/${studentId}`)
     const student = response.data.data
 
-    // ফর্ম ফিলাপ করা
+    // ফর্ম ফিলাপ
     form.value = {
       name: student.name,
       email: student.email,
       admission_no: student.admission_no,
       roll_no: student.roll_no,
-      class_id: student.class_id, // Resource থেকে আসছে
-      section_id: student.section_id, // Resource থেকে আসছে
+      class_id: student.class_id,
+      section_id: student.section_id,
       gender: student.gender,
       dob: student.dob,
       address: student.address,
+      phone: student.phone || '',
+      blood_group: student.blood_group || '',
+      image: null,
+    }
+
+    if (student.image) {
+      imagePreview.value = student.image
+    }
+
+    if (student.class_id) {
+      await handleClassChange(student.class_id)
     }
   } catch (error) {
     console.error(error)
-    alert('স্টুডেন্টের তথ্য পাওয়া যায়নি!')
+    Toast.fire({ icon: 'error', title: 'স্টুডেন্টের তথ্য পাওয়া যায়নি!' }) // ✅ এরর মেসেজ
     router.push('/admin/students')
   }
 }
 
-// ২. আপডেট ফাংশন
+// ৪. নতুন ছবি সিলেক্ট করলে প্রিভিউ চেঞ্জ
+const handleFileChange = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    form.value.image = file
+    imagePreview.value = URL.createObjectURL(file)
+  }
+}
+
+// ৫. আপডেট ফাংশন
 const handleUpdate = async () => {
   isLoading.value = true
   errors.value = {}
 
-  try {
-    const studentId = route.params.id
-    // PUT রিকোয়েস্ট পাঠানো
-    await axios.put(`http://127.0.0.1:8000/api/students/${studentId}`, form.value)
+  const studentId = route.params.id
+  const formData = new FormData()
 
-    alert('তথ্য সফলভাবে আপডেট হয়েছে! 🎉')
+  // লারাভেলে ফাইল আপডেটের জন্য PUT মেথডকে এভাবে পাঠাতে হয়
+  formData.append('_method', 'PUT')
+
+  for (const key in form.value) {
+    if (form.value[key] !== null && form.value[key] !== undefined) {
+      formData.append(key, form.value[key])
+    }
+  }
+
+  try {
+    await axios.post(`http://127.0.0.1:8000/api/students/${studentId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+
+    // ✅✅✅ সুইট অ্যালার্ট সাকসেস মেসেজ
+    await Swal.fire({
+      title: 'সফল!',
+      text: 'স্টুডেন্টের তথ্য সফলভাবে আপডেট হয়েছে 🎉',
+      icon: 'success',
+      confirmButtonText: 'ঠিক আছে',
+      confirmButtonColor: '#2563eb',
+    })
+
     router.push('/admin/students')
   } catch (error) {
     console.error(error)
     if (error.response && error.response.status === 422) {
       errors.value = error.response.data.errors
+      Toast.fire({ icon: 'warning', title: 'দয়া করে ফর্মটি ঠিকঠাক পূরণ করুন' }) // ✅ ওয়ার্নিং মেসেজ
     } else {
-      alert('আপডেট করা সম্ভব হয়নি!')
+      Swal.fire({
+        title: 'ভুল হয়েছে!',
+        text: error.response?.data?.message || 'সার্ভার এরর',
+        icon: 'error',
+        confirmButtonText: 'চেষ্টা করুন',
+      })
     }
   } finally {
     isLoading.value = false
   }
 }
 
-// পেজ লোড হলে কল হবে
-onMounted(() => {
-  fetchStudentData()
+onMounted(async () => {
+  await fetchAcademicData()
+  await fetchStudentData()
 })
 </script>
 
@@ -111,11 +190,7 @@ onMounted(() => {
 
           <div class="form-group">
             <label>অ্যাডমিশন নং</label>
-            <input
-              v-model="form.admission_no"
-              type="text"
-              :class="{ 'border-red': errors.admission_no }"
-            />
+            <input v-model="form.admission_no" type="text" readonly />
           </div>
 
           <div class="form-group">
@@ -125,7 +200,7 @@ onMounted(() => {
 
           <div class="form-group">
             <label>ক্লাস</label>
-            <select v-model="form.class_id">
+            <select v-model="form.class_id" @change="handleClassChange(form.class_id)">
               <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.name }}</option>
             </select>
           </div>
@@ -141,7 +216,7 @@ onMounted(() => {
             <label>লিঙ্গ</label>
             <select v-model="form.gender">
               <option value="Male">ছেলে</option>
-              <option value="Female">মেয়ে</option>
+              <option value="Female">মেয়ে</option>
             </select>
           </div>
 
@@ -149,11 +224,43 @@ onMounted(() => {
             <label>জন্ম তারিখ</label>
             <input v-model="form.dob" type="date" />
           </div>
+
+          <div class="form-group">
+            <label>ফোন নম্বর</label>
+            <input v-model="form.phone" type="text" placeholder="017xxxxxxxx" />
+          </div>
+
+          <div class="form-group">
+            <label>রক্তের গ্রুপ</label>
+            <select v-model="form.blood_group">
+              <option value="">সিলেক্ট করুন</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+            </select>
+          </div>
         </div>
 
         <div class="form-group full-width" style="margin-top: 15px">
           <label>ঠিকানা</label>
           <textarea v-model="form.address" rows="3"></textarea>
+        </div>
+
+        <div class="form-group full-width">
+          <label>স্টুডেন্টের ছবি (পরিবর্তন করতে চাইলে আপলোড করুন)</label>
+          <div class="upload-area">
+            <input type="file" @change="handleFileChange" accept="image/*" class="file-input" />
+
+            <div v-if="imagePreview" class="preview-box">
+              <p>বর্তমান ছবি / প্রিভিউ:</p>
+              <img :src="imagePreview" alt="Preview" class="preview-img" />
+            </div>
+          </div>
         </div>
 
         <div class="form-actions">
@@ -167,7 +274,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Create Page এর স্টাইলগুলোই এখানে ব্যবহার হবে */
 .form-container {
   max-width: 900px;
   margin: 0 auto;
@@ -200,6 +306,7 @@ textarea {
   border: 1px solid #ddd;
   border-radius: 8px;
   width: 100%;
+  box-sizing: border-box;
 }
 .full-width {
   grid-column: span 2;
@@ -214,6 +321,14 @@ textarea {
   float: right;
   font-weight: bold;
 }
+.back-btn {
+  background: #64748b;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
 .border-red {
   border-color: red;
   background: #fff5f5;
@@ -221,5 +336,23 @@ textarea {
 .error-msg {
   color: red;
   font-size: 0.8rem;
+}
+
+/* প্রিভিউ স্টাইল */
+.upload-area {
+  border: 2px dashed #d1d5db;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+.preview-box {
+  margin-top: 15px;
+}
+.preview-img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 3px solid #e5e7eb;
 }
 </style>

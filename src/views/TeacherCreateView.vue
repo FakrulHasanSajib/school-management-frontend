@@ -115,6 +115,28 @@ const handleSubmit = async () => {
             </div>
             <span v-if="errors.phone" class="error-msg">{{ errors.phone[0] }}</span>
           </div>
+          <div class="form-group">
+            <label>রক্তের গ্রুপ</label>
+            <select v-model="form.blood_group" class="input-select">
+              <option value="">নির্বাচন করুন</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>শিক্ষকের ছবি</label>
+            <input type="file" @change="handleFileChange" accept="image/*" />
+            <div v-if="imagePreview" class="preview-box">
+              <img :src="imagePreview" class="preview-img" />
+            </div>
+          </div>
 
           <div class="form-group">
             <label>যোগদানের তারিখ</label>

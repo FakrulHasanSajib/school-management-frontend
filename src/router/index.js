@@ -16,6 +16,11 @@ import SubjectCreateView from '@/views/SubjectCreateView.vue'
 import RoutineListView from '@/views/RoutineListView.vue'
 import RoutineEdit from '@/views/RoutineEdit.vue'
 import StudentIdCard from '@/views/StudentIdCard.vue'
+import TeacherIdCard from '@/views/TeacherIdCard.vue'
+import TakeAttendance from '@/views/TakeAttendance.vue'
+import AttendanceReport from '@/views/AttendanceReport.vue'
+import AttendancePrint from '@/views/AttendancePrint.vue'
+import GeneralSettings from '@/views/GeneralSettings.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -98,6 +103,36 @@ const router = createRouter({
           path: '/admin/students/id-card/:id',
           name: 'StudentIdCard',
           component: StudentIdCard,
+        },
+        {
+          path: '/admin/teachers/id-card/:id',
+          name: 'TeacherIdCard',
+          component: TeacherIdCard,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/admin/attendance/take',
+          name: 'TakeAttendance',
+          component: TakeAttendance,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/admin/attendance/report', // ব্রাউজারে এই লিঙ্কে রিপোর্ট দেখা যাবে
+          name: 'AttendanceReport',
+          component: () => import('../views/AttendanceReport.vue'), // আপনার তৈরি করা কম্পোনেন্ট ফাইল
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/attendance/print-report',
+          name: 'AttendancePrint',
+          component: () => import('../views/AttendancePrint.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/admin/settings',
+          name: 'GeneralSettings',
+          component: () => import('../views/GeneralSettings.vue'),
+          meta: { requiresAuth: true },
         },
       ],
     },

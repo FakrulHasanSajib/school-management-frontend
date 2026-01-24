@@ -39,9 +39,16 @@ const handleLogout = () => {
           <RouterLink to="/admin/routines" class="nav-item" active-class="active">
             <span class="icon">📅</span> Class Routine
           </RouterLink>
+          <router-link to="/admin/attendance/take" class="nav-item">
+            <span class="icon">📝</span>
+            <span class="text">Student Attendance</span>
+          </router-link>
+          <router-link to="/admin/attendance/report" class="nav-item">
+            <span class="icon">📊</span> Attendance Report
+          </router-link>
 
           <RouterLink to="/admin/settings" class="nav-item" active-class="active">
-            <span class="icon">⚙️</span> Settings
+            <span class="icon">⚙️</span> GeneralSettings
           </RouterLink>
         </nav>
 

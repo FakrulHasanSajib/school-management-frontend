@@ -2,12 +2,14 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import Swal from 'sweetalert2' // ✅ সুন্দর মেসেজের জন্য
 
 const route = useRoute()
 const router = useRouter()
 const isLoading = ref(false)
+const errors = ref({})
+const imagePreview = ref(null)
 
-// ফর্মের ডাটা রাখার জন্য ভেরিয়েবল
 const teacher = ref({
   name: '',
   email: '',
@@ -15,107 +17,130 @@ const teacher = ref({
   qualification: '',
   phone: '',
   joining_date: '',
+  blood_group: '', // ✅ নতুন
+  image: null, // ✅ নতুন
 })
 
-// ১. পেজ লোড হলে টিচারের পুরনো তথ্য নিয়ে আসা
+// ১. ডাটা লোড
 const fetchTeacherDetails = async () => {
-  const teacherId = route.params.id
   try {
-    const token = localStorage.getItem('token')
-    const response = await axios.get(`http://127.0.0.1:8000/api/teachers/${teacherId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    // ⚠️ আগে ছিল: const data = response.data
-    // ✅ এখন হবে: const data = response.data.data (কারণ ApiResponse ডাটা র‍্যাপ করে পাঠায়)
+    const teacherId = route.params.id
+    const response = await axios.get(`http://127.0.0.1:8000/api/teachers/${teacherId}`)
     const data = response.data.data
-
-    // কনসোলে চেক করুন ডাটা ঠিকমতো আসছে কি না
-    console.log('Teacher Data:', data)
 
     teacher.value = {
       name: data.name,
       email: data.email,
-      // সেফটি চেকসহ ভ্যালু বসানো
       designation: data.teacher_profile?.designation || '',
       qualification: data.teacher_profile?.qualification || '',
       phone: data.teacher_profile?.phone || '',
       joining_date: data.teacher_profile?.joining_date || '',
+      blood_group: data.teacher_profile?.blood_group || '',
+    }
+    if (data.teacher_profile?.image) {
+      imagePreview.value = `http://127.0.0.1:8000/storage/${data.teacher_profile.image}`
     }
   } catch (error) {
-    console.error('Error loading teacher:', error)
-    alert('শিক্ষকের তথ্য লোড করা যায়নি!')
+    Swal.fire('Error', 'তথ্য লোড করা যায়নি', 'error')
   }
 }
 
-// ২. আপডেট বাটন চাপলে ডাটা সেভ করা
-const handleUpdate = async () => {
-  const teacherId = route.params.id
-  try {
-    isLoading.value = true
-    const token = localStorage.getItem('token')
+const handleFileChange = (e) => {
+  const file = e.target.files[0]
+  if (file) {
+    teacher.value.image = file
+    imagePreview.value = URL.createObjectURL(file)
+  }
+}
 
-    await axios.put(`http://127.0.0.1:8000/api/teachers/${teacherId}`, teacher.value, {
-      headers: { Authorization: `Bearer ${token}` },
+// ২. আপডেট ফাংশন
+const handleUpdate = async () => {
+  isLoading.value = true
+  const formData = new FormData()
+  formData.append('_method', 'PUT') // ✅ লারাভেল PUT-এ ফাইল নিতে এটা লাগে
+
+  for (const key in teacher.value) {
+    if (teacher.value[key] !== null) formData.append(key, teacher.value[key])
+  }
+
+  try {
+    await axios.post(`http://127.0.0.1:8000/api/teachers/${route.params.id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     })
 
-    alert('সফলভাবে আপডেট হয়েছে!')
-    router.push('/admin/teachers') // লিস্ট পেজে ফেরত যাওয়া
+    // ✅ সুন্দর সাকসেস মেসেজ
+    await Swal.fire({
+      icon: 'success',
+      title: 'সফল!',
+      text: 'শিক্ষকের তথ্য আপডেট হয়েছে 🎉',
+      timer: 2000,
+      showConfirmButton: false,
+    })
+    router.push('/admin/teachers')
   } catch (error) {
-    console.error('Update Error:', error)
-    alert('আপডেট করা সম্ভব হয়নি!')
+    if (error.response?.status === 422) errors.value = error.response.data.errors
+    else Swal.fire('ভুল হয়েছে', 'আপডেট করা সম্ভব হয়নি', 'error')
   } finally {
     isLoading.value = false
   }
 }
 
-// পেজ মাউন্ট হলে ফাংশন কল হবে
-onMounted(() => {
-  fetchTeacherDetails()
-})
+onMounted(fetchTeacherDetails)
 </script>
 
 <template>
   <div class="edit-container">
     <div class="header">
-      <h2>✏️ শিক্ষক এডিট করুন</h2>
+      <h2>✏️ শিক্ষক তথ্য পরিবর্তন</h2>
       <button @click="router.back()" class="back-btn">← ফিরে যান</button>
     </div>
 
     <div class="form-card">
       <form @submit.prevent="handleUpdate">
-        <div class="form-group">
-          <label>শিক্ষকের নাম</label>
-          <input v-model="teacher.name" type="text" required />
+        <div class="grid-form">
+          <div class="form-group">
+            <label>নাম</label>
+            <input v-model="teacher.name" type="text" />
+          </div>
+          <div class="form-group">
+            <label>ইমেইল</label>
+            <input v-model="teacher.email" type="email" />
+          </div>
+          <div class="form-group">
+            <label>পদবী</label>
+            <input v-model="teacher.designation" type="text" />
+          </div>
+          <div class="form-group">
+            <label>ফোন নম্বর</label>
+            <input v-model="teacher.phone" type="text" />
+          </div>
+          <div class="form-group">
+            <label>রক্তের গ্রুপ</label>
+            <select v-model="teacher.blood_group">
+              <option value="">নির্বাচন করুন</option>
+              <option
+                v-for="bg in ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']"
+                :key="bg"
+                :value="bg"
+              >
+                {{ bg }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>যোগদানের তারিখ</label>
+            <input v-model="teacher.joining_date" type="date" />
+          </div>
         </div>
 
-        <div class="form-group">
-          <label>ইমেইল</label>
-          <input v-model="teacher.email" type="email" required />
-        </div>
-
-        <div class="form-group">
-          <label>পদবী (Designation)</label>
-          <input v-model="teacher.designation" type="text" required />
-        </div>
-
-        <div class="form-group">
-          <label>শিক্ষাগত যোগ্যতা</label>
-          <input v-model="teacher.qualification" type="text" required />
-        </div>
-
-        <div class="form-group">
-          <label>ফোন নম্বর</label>
-          <input v-model="teacher.phone" type="text" required />
-        </div>
-
-        <div class="form-group">
-          <label>জয়েনিং ডেট</label>
-          <input v-model="teacher.joining_date" type="date" required />
+        <div class="image-section">
+          <label>প্রোফাইল ছবি</label>
+          <input type="file" @change="handleFileChange" />
+          <img v-if="imagePreview" :src="imagePreview" class="preview-img" />
         </div>
 
         <button type="submit" class="update-btn" :disabled="isLoading">
-          {{ isLoading ? 'আপডেট হচ্ছে...' : 'তথ্য আপডেট করুন' }}
+          {{ isLoading ? 'সেভ হচ্ছে...' : '💾 পরিবর্তন সেভ করুন' }}
         </button>
       </form>
     </div>
@@ -124,9 +149,9 @@ onMounted(() => {
 
 <style scoped>
 .edit-container {
-  padding: 20px;
   max-width: 800px;
   margin: 0 auto;
+  padding: 20px;
 }
 .header {
   display: flex;
@@ -137,23 +162,37 @@ onMounted(() => {
 .form-card {
   background: white;
   padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
-.form-group {
-  margin-bottom: 15px;
+.grid-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
 }
 .form-group label {
   display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
-  color: #333;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #475569;
 }
-.form-group input {
+.form-group input,
+.form-group select {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+.image-section {
+  margin-top: 20px;
+}
+.preview-img {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-top: 10px;
+  border: 2px solid #3b82f6;
 }
 .update-btn {
   width: 100%;
@@ -161,20 +200,21 @@ onMounted(() => {
   color: white;
   padding: 12px;
   border: none;
-  border-radius: 5px;
-  font-size: 16px;
+  border-radius: 8px;
+  font-weight: bold;
   cursor: pointer;
-  margin-top: 10px;
+  margin-top: 20px;
+  transition: 0.3s;
 }
-.update-btn:disabled {
-  background: #93c5fd;
+.update-btn:hover {
+  background: #1d4ed8;
 }
 .back-btn {
   background: #64748b;
   color: white;
   border: none;
-  padding: 8px 15px;
-  border-radius: 5px;
+  padding: 8px 16px;
+  border-radius: 6px;
   cursor: pointer;
 }
 </style>

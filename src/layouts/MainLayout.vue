@@ -46,6 +46,12 @@ const handleLogout = () => {
           <router-link to="/admin/attendance/report" class="nav-item">
             <span class="icon">📊</span> Attendance Report
           </router-link>
+          <router-link to="/admin/exam/marks-entry" class="nav-link">
+            <span class="icon">💯</span>Marks Entry
+          </router-link>
+          <router-link to="/admin/exam/list" class="nav-link">
+            <span class="icon">📝</span>Exam List
+          </router-link>
 
           <RouterLink to="/admin/settings" class="nav-item" active-class="active">
             <span class="icon">⚙️</span> GeneralSettings

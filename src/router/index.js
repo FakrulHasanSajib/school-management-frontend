@@ -21,6 +21,8 @@ import TakeAttendance from '@/views/TakeAttendance.vue'
 import AttendanceReport from '@/views/AttendanceReport.vue'
 import AttendancePrint from '@/views/AttendancePrint.vue'
 import GeneralSettings from '@/views/GeneralSettings.vue'
+import ExamList from '@/views/ExamList.vue'
+import MarksEntry from '@/views/MarksEntry.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -132,6 +134,18 @@ const router = createRouter({
           path: '/admin/settings',
           name: 'GeneralSettings',
           component: () => import('../views/GeneralSettings.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/exam/list',
+          name: 'ExamList',
+          component: () => import('../views/ExamList.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/exam/marks-entry',
+          name: 'MarksEntry',
+          component: () => import('../views/MarksEntry.vue'),
           meta: { requiresAuth: true },
         },
       ],

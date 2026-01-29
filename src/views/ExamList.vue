@@ -4,26 +4,53 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 
 const exams = ref([])
+const classes = ref([])
+
+// ফর্মের ডাটা (Controller এর ডিমান্ড অনুযায়ী ৫টি ফিল্ড)
 const name = ref('')
+const selectedClass = ref('') // class_id
+const session = ref(new Date().getFullYear()) // ডিফল্ট বর্তমান বছর (নাম্বার)
 const startDate = ref('')
+const endDate = ref('')
+
 const loading = ref(false)
 const token = localStorage.getItem('token')
 
 const apiConfig = { headers: { Authorization: `Bearer ${token}` } }
 
-// ১. সব পরীক্ষার লিস্ট আনা
-const fetchExams = async () => {
+// ১. ক্লাসের লিস্ট আনা
+const fetchClasses = async () => {
   try {
-    const res = await axios.get('http://127.0.0.1:8000/api/exams', apiConfig)
-    exams.value = res.data.data || res.data // আপনার API রেসপন্স স্ট্রাকচার অনুযায়ী
+    const res = await axios.get('http://127.0.0.1:8000/api/academic/classes', apiConfig)
+    classes.value = res.data.data || res.data
   } catch (error) {
-    console.error(error)
+    console.error('Error fetching classes:', error)
   }
 }
 
-// ২. নতুন পরীক্ষা তৈরি করা
+// ২. সব পরীক্ষার লিস্ট আনা
+const fetchExams = async () => {
+  try {
+    const res = await axios.get('http://127.0.0.1:8000/api/exams', apiConfig)
+    exams.value = res.data.data || res.data
+  } catch (error) {
+    console.error('Fetch Error:', error)
+    if (error.response && error.response.status === 405) {
+      Swal.fire('Error', 'Back-end e GET route nei! api.php check korun.', 'error')
+    }
+  }
+}
+
+// ৩. নতুন পরীক্ষা তৈরি করা
 const createExam = async () => {
-  if (!name.value || !startDate.value) return Swal.fire('Error', 'নাম এবং তারিখ দিন', 'warning')
+  // ভ্যালিডেশন
+  if (!name.value || !selectedClass.value || !startDate.value || !endDate.value || !session.value) {
+    return Swal.fire(
+      'Warning',
+      'সবগুলো ফিল্ড পূরণ করা বাধ্যতামূলক (নাম, ক্লাস, সেশন, তারিখ)',
+      'warning',
+    )
+  }
 
   loading.value = true
   try {
@@ -31,23 +58,42 @@ const createExam = async () => {
       'http://127.0.0.1:8000/api/exams',
       {
         name: name.value,
+        class_id: selectedClass.value,
+
+        // ✅ ফিক্স: সেশনকে স্ট্রিংয়ে কনভার্ট করা হলো (String Convert Fix)
+        session: String(session.value),
+
         start_date: startDate.value,
+        end_date: endDate.value,
       },
       apiConfig,
     )
 
-    Swal.fire('Success', 'পরীক্ষা তৈরি হয়েছে!', 'success')
+    Swal.fire('Success', 'পরীক্ষা সফলভাবে তৈরি হয়েছে!', 'success')
+
+    // ফর্ম রিসেট
     name.value = ''
     startDate.value = ''
-    fetchExams() // লিস্ট রিফ্রেশ
+    endDate.value = ''
+    fetchExams() // লিস্ট আপডেট
   } catch (error) {
-    Swal.fire('Error', 'সেভ করা যায়নি', 'error')
+    if (error.response && error.response.status === 422) {
+      // Validation Error
+      const errorMsg = Object.values(error.response.data.errors).flat().join('<br>')
+      Swal.fire({ icon: 'error', title: 'Validation Error', html: errorMsg })
+    } else {
+      Swal.fire('Error', 'সেভ করা যায়নি।', 'error')
+      console.error(error)
+    }
   } finally {
     loading.value = false
   }
 }
 
-onMounted(fetchExams)
+onMounted(() => {
+  fetchClasses()
+  fetchExams()
+})
 </script>
 
 <template>
@@ -55,12 +101,42 @@ onMounted(fetchExams)
     <div class="card">
       <h3>📝 পরীক্ষার তালিকা ও সেটআপ</h3>
 
-      <div class="form-row">
-        <input v-model="name" type="text" placeholder="পরীক্ষার নাম (উদাঃ Final Exam 2026)" />
-        <input v-model="startDate" type="date" />
-        <button @click="createExam" :disabled="loading" class="btn-save">
-          {{ loading ? 'সেভ হচ্ছে...' : '+ নতুন এক্সাম' }}
-        </button>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>পরীক্ষার নাম</label>
+          <input v-model="name" type="text" placeholder="উদাঃ Final Exam" />
+        </div>
+
+        <div class="form-group">
+          <label>ক্লাস সিলেক্ট করুন</label>
+          <select v-model="selectedClass">
+            <option value="">ক্লাস বেছে নিন</option>
+            <option v-for="cls in classes" :key="cls.id" :value="cls.id">
+              {{ cls.name }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>সেশন (বছর)</label>
+          <input v-model="session" type="text" placeholder="2026" />
+        </div>
+
+        <div class="form-group">
+          <label>শুরুর তারিখ</label>
+          <input v-model="startDate" type="date" />
+        </div>
+
+        <div class="form-group">
+          <label>শেষের তারিখ</label>
+          <input v-model="endDate" type="date" />
+        </div>
+
+        <div class="form-group btn-container">
+          <button @click="createExam" :disabled="loading" class="btn-save">
+            {{ loading ? 'সেভ হচ্ছে...' : '+ সেভ করুন' }}
+          </button>
+        </div>
       </div>
 
       <table class="table mt-4">
@@ -68,7 +144,8 @@ onMounted(fetchExams)
           <tr>
             <th>ID</th>
             <th>পরীক্ষার নাম</th>
-            <th>শুরুর তারিখ</th>
+            <th>ক্লাস ID</th>
+            <th>তারিখ</th>
             <th>স্ট্যাটাস</th>
           </tr>
         </thead>
@@ -76,7 +153,8 @@ onMounted(fetchExams)
           <tr v-for="exam in exams" :key="exam.id">
             <td>{{ exam.id }}</td>
             <td class="font-bold">{{ exam.name }}</td>
-            <td>{{ exam.start_date }}</td>
+            <td>{{ exam.class_id }}</td>
+            <td>{{ exam.start_date }} - {{ exam.end_date }}</td>
             <td><span class="badge">Active</span></td>
           </tr>
         </tbody>
@@ -92,16 +170,32 @@ onMounted(fetchExams)
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
-.form-row {
-  display: flex;
-  gap: 10px;
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
   margin-top: 20px;
+  align-items: end;
 }
-input {
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+label {
+  font-size: 14px;
+  font-weight: bold;
+  color: #555;
+}
+input,
+select {
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 5px;
-  flex: 1;
+  width: 100%;
+}
+.btn-container {
+  justify-content: flex-end;
 }
 .btn-save {
   background: #2563eb;
@@ -110,11 +204,13 @@ input {
   border: none;
   border-radius: 5px;
   cursor: pointer;
+  height: 42px;
+  margin-top: auto;
 }
 .table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 20px;
+  margin-top: 30px;
 }
 .table th,
 .table td {

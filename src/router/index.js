@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import StudentsView from '../views/StudentsView.vue'
-import MainLayout from '../layouts/MainLayout.vue' // লেআউট ইমপোর্ট
+import MainLayout from '../layouts/MainLayout.vue'
 import TeachersView from '../views/TeachersView.vue'
 import StudentCreateView from '../views/StudentCreateView.vue'
 import StudentEditView from '../views/StudentEditView.vue'
@@ -38,16 +38,15 @@ const router = createRouter({
       component: MainLayout, // প্যারেন্ট লেআউট
       children: [
         {
-          path: 'dashboard', // লিংক হবে: /admin/dashboard
+          path: 'dashboard',
           component: DashboardView,
         },
         {
-          path: 'students', // লিংক হবে: /admin/students
+          path: 'students',
           component: StudentsView,
         },
-
         {
-          path: 'teachers', // নতুন রাউট
+          path: 'teachers',
           component: TeachersView,
         },
         {
@@ -56,7 +55,7 @@ const router = createRouter({
           component: StudentCreateView,
         },
         {
-          path: 'students/edit/:id', // :id মানে এখানে স্টুডেন্টের আইডি বসবে
+          path: 'students/edit/:id',
           name: 'students-edit',
           component: StudentEditView,
         },
@@ -76,7 +75,7 @@ const router = createRouter({
           component: () => import('../views/TeacherEditView.vue'),
         },
         {
-          path: '/admin/teachers/view/:id', // আলাদা ইউআরএল
+          path: '/admin/teachers/view/:id',
           name: 'teachers.view',
           component: () => import('../views/TeacherProfileView.vue'),
         },
@@ -91,7 +90,7 @@ const router = createRouter({
           component: () => import('../views/SubjectCreateView.vue'),
         },
         {
-          path: '/admin/routines', // লিস্ট দেখার রাউট
+          path: '/admin/routines',
           name: 'routines.index',
           component: () => import('../views/RoutineListView.vue'),
         },
@@ -119,13 +118,13 @@ const router = createRouter({
           meta: { requiresAuth: true },
         },
         {
-          path: '/admin/attendance/report', // ব্রাউজারে এই লিঙ্কে রিপোর্ট দেখা যাবে
+          path: '/admin/attendance/report',
           name: 'AttendanceReport',
-          component: () => import('../views/AttendanceReport.vue'), // আপনার তৈরি করা কম্পোনেন্ট ফাইল
+          component: () => import('../views/AttendanceReport.vue'),
           meta: { requiresAuth: true },
         },
         {
-          path: '/attendance/print-report',
+          path: '/attendance/print-report', // এটি প্রিন্ট পেজ, তাই /admin ছাড়া রাখা হয়েছে (আগের মতোই)
           name: 'AttendancePrint',
           component: () => import('../views/AttendancePrint.vue'),
           meta: { requiresAuth: true },
@@ -136,14 +135,16 @@ const router = createRouter({
           component: () => import('../views/GeneralSettings.vue'),
           meta: { requiresAuth: true },
         },
+
+        // ✅ ফিক্সড: আপনার বাকি রাউটগুলোর মতো /admin দিয়ে শুরু করা হলো
         {
-          path: '/exam/list',
+          path: '/admin/exam/list',
           name: 'ExamList',
           component: () => import('../views/ExamList.vue'),
           meta: { requiresAuth: true },
         },
         {
-          path: '/exam/marks-entry',
+          path: '/admin/exam/marks-entry',
           name: 'MarksEntry',
           component: () => import('../views/MarksEntry.vue'),
           meta: { requiresAuth: true },

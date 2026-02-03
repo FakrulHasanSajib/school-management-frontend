@@ -14,8 +14,18 @@ const handleLogin = async () => {
   isLoading.value = true
   errorMessage.value = ''
   try {
+    // ১. লগইন অ্যাকশন কল করা
     await authStore.login(email.value, password.value)
-    router.push('/admin/dashboard')
+
+    // ২. রোল চেক করা (স্টোর বা লোকাল স্টোরেজ থেকে)
+    const role = localStorage.getItem('user_role') || authStore.user?.role
+
+    // ৩. রোল অনুযায়ী সঠিক ড্যাশবোর্ডে রিডাইরেক্ট
+    if (role === 'student') {
+      router.push('/student/dashboard')
+    } else {
+      router.push('/admin/dashboard')
+    }
   } catch (error) {
     if (error.response && error.response.data) {
       errorMessage.value = error.response.data.message
@@ -53,11 +63,11 @@ const handleLogin = async () => {
 
           <form @submit.prevent="handleLogin">
             <div class="input-group">
-              <label>Username</label>
+              <label>Email / Username</label>
               <input
                 type="text"
                 v-model="email"
-                placeholder="Enter your username"
+                placeholder="Enter your email"
                 class="glass-input"
               />
             </div>
@@ -85,7 +95,7 @@ const handleLogin = async () => {
           </form>
 
           <div class="footer-text">
-            New to Logo? <a href="#" class="register-link">Register</a> Here
+            New to School? <a href="#" class="register-link">Register</a> Here
           </div>
         </div>
       </div>

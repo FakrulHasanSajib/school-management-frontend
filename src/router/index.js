@@ -24,8 +24,12 @@ import ExamList from '@/views/ExamList.vue'
 import MarksEntry from '@/views/MarksEntry.vue'
 import ReportCard from '../views/ReportCard.vue'
 import TabulationSheet from '../views/TabulationSheet.vue'
-// ✅ New Import
 import Fees from '../views/Fees.vue'
+
+// ✅ Student Portal Imports
+import StudentLayout from '../layouts/StudentLayout.vue'
+import StudentDashboard from '../views/student/StudentDashboard.vue'
+import StudentChangePassword from '../views/student/StudentChangePassword.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -35,10 +39,12 @@ const router = createRouter({
       name: 'login',
       component: LoginView,
     },
-    // Protected Routes (Layout Required)
+
+    // 🛡️ ADMIN ROUTES (MainLayout)
     {
       path: '/admin',
       component: MainLayout,
+      // meta: { requiresAuth: true, role: 'admin' }, // রোল চেক লজিক পরে লাগলে আনকমেন্ট করবেন
       children: [
         {
           path: 'dashboard',
@@ -158,17 +164,31 @@ const router = createRouter({
         },
         {
           path: '/tabulation-sheet',
-          name: 'TabulationSheet', // Added name for consistency
+          name: 'TabulationSheet',
           component: TabulationSheet,
           meta: { requiresAuth: true },
         },
-        // ✅ New Fees Route
         {
           path: '/fees',
           name: 'Fees',
           component: Fees,
           meta: { requiresAuth: true },
         },
+      ],
+    },
+
+    // 🎓 STUDENT ROUTES (NEW)
+    {
+      path: '/student',
+      component: StudentLayout,
+      meta: { requiresAuth: true, role: 'student' },
+      children: [
+        {
+          path: 'dashboard',
+          component: StudentDashboard,
+        },
+        // ভবিষ্যতে রুটিন, রেজাল্ট ইত্যাদি এখানে যোগ হবে
+        { path: 'change-password', component: StudentChangePassword },
       ],
     },
   ],

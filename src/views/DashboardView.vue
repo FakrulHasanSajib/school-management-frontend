@@ -1,122 +1,443 @@
+<script setup>
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+} from 'chart.js'
+import { Bar, Doughnut } from 'vue-chartjs'
+
+// Chart.js রেজিস্টার করা
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+)
+
+const BASE_URL =
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://127.0.0.1:8000/api'
+    : '/api'
+const token = localStorage.getItem('token')
+const apiConfig = { headers: { Authorization: `Bearer ${token}` } }
+
+// States
+const stats = ref({
+  total_students: 0,
+  total_teachers: 0,
+  total_income: 0,
+  todays_present: 0,
+})
+const recentPayments = ref([])
+const loading = ref(true)
+const chartsLoaded = ref(false) // চার্ট লোড হওয়ার আগে দেখাবো না
+
+// Chart Data (Reactive)
+const incomeChartData = ref({
+  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  datasets: [
+    {
+      label: 'Income (Tk)',
+      backgroundColor: '#3b82f6',
+      data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // ডিফল্ট ভ্যালু
+      borderRadius: 5,
+    },
+  ],
+})
+
+const attendanceChartData = ref({
+  labels: ['Present', 'Absent', 'Late'],
+  datasets: [
+    {
+      backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+      data: [0, 0, 0], // ডিফল্ট ভ্যালু
+    },
+  ],
+})
+
+// Options
+const incomeChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+}
+const attendanceChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+}
+
+// Data Load
+const loadDashboardData = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/dashboard/stats`, apiConfig)
+    if (res.data.status) {
+      // ১. কার্ড আপডেট
+      stats.value = res.data.data.stats
+
+      // ২. রিসেন্ট পেমেন্ট আপডেট
+      recentPayments.value = res.data.data.recent_payments
+
+      // ৩. ইনকাম চার্ট আপডেট (Dynamic)
+      incomeChartData.value = {
+        labels: res.data.data.chart_data.months,
+        datasets: [
+          {
+            label: 'Income (Tk)',
+            backgroundColor: '#3b82f6',
+            data: res.data.data.chart_data.income,
+            borderRadius: 5,
+          },
+        ],
+      }
+
+      // ৪. এটেন্ডেন্স চার্ট আপডেট (Dynamic)
+      attendanceChartData.value = {
+        labels: ['Present', 'Absent', 'Late'],
+        datasets: [
+          {
+            backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+            data: res.data.data.chart_data.attendance,
+          },
+        ],
+      }
+
+      chartsLoaded.value = true // চার্ট ডাটা রেডি
+    }
+  } catch (error) {
+    console.error('Dashboard failed:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadDashboardData()
+})
+</script>
+
 <template>
-  <div>
+  <div class="dashboard-container">
+    <div class="header mb-4">
+      <h2 class="text-white">Admin Dashboard</h2>
+      <p class="text-gray">Welcome back, here's what's happening today.</p>
+    </div>
+
     <div class="stats-grid">
-      <div class="card">
-        <div class="card-icon blue-bg">👨‍🎓</div>
+      <div class="stat-card gradient-1">
+        <div class="icon-box">👨‍🎓</div>
         <div>
-          <h4>মোট স্টুডেন্ট</h4>
-          <p class="number">১,২০০</p>
+          <p class="stat-label">Total Students</p>
+          <h3 class="stat-value">{{ loading ? '...' : stats.total_students }}</h3>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-icon green-bg">👨‍🏫</div>
+      <div class="stat-card gradient-2">
+        <div class="icon-box">👨‍🏫</div>
         <div>
-          <h4>মোট টিচার</h4>
-          <p class="number">৪৫</p>
+          <p class="stat-label">Total Teachers</p>
+          <h3 class="stat-value">{{ loading ? '...' : stats.total_teachers }}</h3>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-icon purple-bg">৳</div>
+      <div class="stat-card gradient-3">
+        <div class="icon-box">💰</div>
         <div>
-          <h4>এই মাসের আয়</h4>
-          <p class="number">৫০,০০০ ৳</p>
+          <p class="stat-label">Total Income</p>
+          <h3 class="stat-value">৳ {{ loading ? '...' : stats.total_income }}</h3>
+        </div>
+      </div>
+
+      <div class="stat-card gradient-4">
+        <div class="icon-box">📊</div>
+        <div>
+          <p class="stat-label">Today's Attendance</p>
+          <h3 class="stat-value">{{ loading ? '...' : stats.todays_present }}</h3>
         </div>
       </div>
     </div>
 
-    <div class="recent-section">
-      <h3>সাম্প্রতিক অ্যাক্টিভিটি</h3>
-      <p class="no-data">সিস্টেমে কোনো নতুন আপডেট নেই...</p>
+    <div class="charts-grid mt-section">
+      <div class="chart-card">
+        <h4>Monthly Income Overview (This Year)</h4>
+        <div class="chart-container">
+          <Bar v-if="chartsLoaded" :data="incomeChartData" :options="incomeChartOptions" />
+          <p v-else class="loading-text">Loading Chart...</p>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h4>Today's Attendance Ratio</h4>
+        <div class="chart-container">
+          <Doughnut
+            v-if="chartsLoaded"
+            :data="attendanceChartData"
+            :options="attendanceChartOptions"
+          />
+          <p v-else class="loading-text">Loading Chart...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="recent-section mt-section">
+      <div class="section-header">
+        <h3>Recent Fee Collections</h3>
+        <router-link to="/fees" class="btn-sm">View All</router-link>
+      </div>
+
+      <div class="table-responsive">
+        <table class="styled-table">
+          <thead>
+            <tr>
+              <th>Student Name</th>
+              <th>Fee Type</th>
+              <th>Amount</th>
+              <th>Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading">
+              <td colspan="5" class="text-center">Loading...</td>
+            </tr>
+            <tr v-for="pay in recentPayments" :key="pay.id">
+              <td>
+                <div class="user-info">
+                  <div class="avatar">{{ pay.student_name.charAt(0) }}</div>
+                  <span>{{ pay.student_name }}</span>
+                </div>
+              </td>
+              <td>{{ pay.fee_type }}</td>
+              <td class="font-bold">৳ {{ pay.amount }}</td>
+              <td>{{ pay.date }}</td>
+              <td><span class="badge success">Paid</span></td>
+            </tr>
+            <tr v-if="!loading && recentPayments.length === 0">
+              <td colspan="5" class="text-center py-4">No recent payments found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* গ্রিড লেআউট */
+/* Dashboard Container */
+.dashboard-container {
+  padding-bottom: 50px;
+}
+.text-gray {
+  color: #a1a5b7;
+  font-size: 14px;
+}
+.mt-section {
+  margin-top: 30px;
+} /* ✅ Fix: সেকশনগুলোর মাঝে গ্যাপ বাড়ানো হয়েছে */
+
+/* 1. Stats Grid */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  gap: 25px; /* ✅ Fix: কার্ডগুলোর মাঝে গ্যাপ বাড়ানো হয়েছে */
 }
 
-/* কার্ড ডিজাইন (ডার্ক থিম অনুযায়ী অ্যাডজাস্ট করা) */
-.card {
-  background: #212121; /* সাদা রঙের বদলে ডার্ক কালার */
-  padding: 1.5rem;
-  border-radius: 16px;
+.stat-card {
+  padding: 25px;
+  border-radius: 15px;
+  color: white;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  transition: transform 0.2s;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 15px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15); /* শ্যাডো বাড়ানো হয়েছে */
+  transition: transform 0.3s ease;
+}
+.stat-card:hover {
+  transform: translateY(-5px);
 }
 
-.card:hover {
-  transform: translateY(-3px);
-  background: #2a2a2a; /* হোভার করলে একটু লাইট হবে */
+/* Gradient Backgrounds */
+.gradient-1 {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.gradient-2 {
+  background: linear-gradient(135deg, #2af598 0%, #009efd 100%);
+}
+.gradient-3 {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
+  color: #fff;
+}
+.gradient-3 .stat-label,
+.gradient-3 .stat-value {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.gradient-4 {
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
 }
 
-/* আইকন বক্স */
-.card-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
+.icon-box {
+  background: rgba(255, 255, 255, 0.25);
+  width: 55px;
+  height: 55px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.6rem;
+  font-size: 26px;
 }
-
-/* আইকনের ব্যাকগ্রাউন্ড (ডার্ক মোডে হালকা কালার) */
-.blue-bg {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-}
-.green-bg {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
-}
-.purple-bg {
-  background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
-}
-
-/* টেক্সট স্টাইল */
-.card h4 {
+.stat-label {
   margin: 0;
-  font-size: 0.9rem;
-  color: #a0a0a0; /* হালকা গ্রে টেক্সট */
-  font-weight: 600;
+  font-size: 14px;
+  opacity: 0.95;
+  font-weight: 500;
 }
-
-.card .number {
+.stat-value {
   margin: 5px 0 0;
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: #ffffff; /* সাদা টেক্সট */
+  font-size: 26px;
+  font-weight: 800;
 }
 
-/* রিসেন্ট অ্যাক্টিভিটি */
+/* 2. Charts Grid */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 25px; /* ✅ Fix: চার্ট কার্ডের মাঝে গ্যাপ */
+}
+@media (max-width: 900px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-card {
+  background: #1e1e2d;
+  padding: 25px;
+  border-radius: 15px;
+  border: 1px solid #2b2b40;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+.chart-card h4 {
+  color: #fff;
+  margin-bottom: 20px;
+  font-size: 16px;
+  border-bottom: 1px solid #2b2b40;
+  padding-bottom: 10px;
+}
+.chart-container {
+  position: relative;
+  height: 300px;
+  width: 100%;
+}
+.loading-text {
+  color: #888;
+  text-align: center;
+  margin-top: 50px;
+}
+
+/* 3. Recent Table */
 .recent-section {
-  background: #212121;
-  padding: 1.5rem;
-  border-radius: 16px;
+  background: #1e1e2d;
+  padding: 25px;
+  border-radius: 15px;
+  border: 1px solid #2b2b40;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.section-header h3 {
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin: 0;
+  font-size: 18px;
+}
+.btn-sm {
+  background: #3699ff;
+  color: white;
+  text-decoration: none;
+  padding: 6px 15px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: 0.2s;
+}
+.btn-sm:hover {
+  background: #2b7ce0;
 }
 
-.recent-section h3 {
-  margin-top: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+.styled-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.styled-table th {
+  text-align: left;
+  padding: 15px;
+  color: #565674;
+  font-size: 13px;
+  border-bottom: 1px solid #2b2b40;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.styled-table td {
+  padding: 15px;
+  color: #b5b5c3;
+  font-size: 14px;
+  border-bottom: 1px solid #2b2b40;
+}
+.styled-table tr:last-child td {
+  border-bottom: none;
+}
+.styled-table tr:hover {
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.no-data {
-  color: #a0a0a0;
-  margin-top: 10px;
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar {
+  width: 35px;
+  height: 35px;
+  background: #3699ff;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.badge.success {
+  background: rgba(28, 209, 107, 0.15);
+  color: #1cd16b;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+}
+.text-center {
+  text-align: center;
+}
+.py-4 {
+  padding-top: 20px;
+  padding-bottom: 20px;
 }
 </style>

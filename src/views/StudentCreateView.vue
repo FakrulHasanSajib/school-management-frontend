@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
+import Swal from 'sweetalert2' // সুন্দর এলার্টের জন্য
 
 const router = useRouter()
 const isLoading = ref(false)
@@ -11,13 +12,13 @@ const errors = ref({})
 const classes = ref([])
 const filteredSections = ref([])
 
-// ✅ ১. ছবির প্রিভিউ দেখার জন্য ভেরিয়েবল
+// ছবির প্রিভিউ দেখার জন্য ভেরিয়েবল
 const imagePreview = ref(null)
 
 const form = ref({
   name: '',
   email: '',
-  password: 'password',
+  // password ফিল্ড বাদ দেওয়া হয়েছে (অটোমেটিক 12345678 সেট হবে)
   admission_no: '',
   roll_no: '',
   class_id: '',
@@ -73,12 +74,11 @@ const fetchNextNumbers = async () => {
   }
 }
 
-// ✅ ২. ফাইল হ্যান্ডলিং এবং প্রিভিউ জেনারেট
+// ফাইল হ্যান্ডলিং এবং প্রিভিউ জেনারেট
 const handleFileChange = (event) => {
   const file = event.target.files[0]
   if (file) {
     form.value.image = file
-    // ব্রাউজারে প্রিভিউ URL তৈরি করা
     imagePreview.value = URL.createObjectURL(file)
   } else {
     form.value.image = null
@@ -95,7 +95,6 @@ const handleSubmit = async () => {
   const formData = new FormData()
 
   for (const key in form.value) {
-    // null বা undefined বাদে সব ডাটা অ্যাপেন্ড করা
     if (form.value[key] !== null && form.value[key] !== undefined && form.value[key] !== '') {
       formData.append(key, form.value[key])
     }
@@ -105,13 +104,25 @@ const handleSubmit = async () => {
     await axios.post('http://127.0.0.1:8000/api/students/admit', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    alert('স্টুডেন্ট সফলভাবে ভর্তি হয়েছে! 🎉')
+
+    // সুইট এলার্ট মেসেজ
+    await Swal.fire({
+      title: 'সফল!',
+      text: 'স্টুডেন্ট সফলভাবে ভর্তি হয়েছে! ডিফল্ট পাসওয়ার্ড: 12345678',
+      icon: 'success',
+      confirmButtonText: 'ঠিক আছে',
+    })
+
     router.push('/admin/students')
   } catch (error) {
     if (error.response && error.response.status === 422) {
       errors.value = error.response.data.errors
     } else {
-      alert('Error: ' + (error.response?.data?.message || 'সার্ভার এরর'))
+      Swal.fire({
+        title: 'এরর!',
+        text: error.response?.data?.message || 'সার্ভার এরর',
+        icon: 'error',
+      })
     }
   } finally {
     isLoading.value = false
@@ -154,17 +165,6 @@ onMounted(() => {
               :class="{ 'border-red': errors.email }"
             />
             <span v-if="errors.email" class="error-msg">{{ errors.email[0] }}</span>
-          </div>
-
-          <div class="form-group">
-            <label>পাসওয়ার্ড</label>
-            <input
-              v-model="form.password"
-              type="password"
-              placeholder="পাসওয়ার্ড"
-              :class="{ 'border-red': errors.password }"
-            />
-            <span v-if="errors.password" class="error-msg">{{ errors.password[0] }}</span>
           </div>
 
           <div class="form-group">
@@ -348,8 +348,6 @@ textarea {
   border-radius: 6px;
   cursor: pointer;
 }
-
-/* ✅ আপলোড এবং প্রিভিউ স্টাইল */
 .upload-area {
   border: 2px dashed #d1d5db;
   padding: 20px;

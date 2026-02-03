@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 
@@ -10,7 +10,7 @@ const BASE_URL =
 const token = localStorage.getItem('token')
 const apiConfig = { headers: { Authorization: `Bearer ${token}` } }
 
-// Tabs: 'setup', 'invoice', 'collection', 'history'
+// Tabs
 const activeTab = ref('collection')
 
 // States
@@ -18,9 +18,9 @@ const feeTypes = ref([])
 const classes = ref([])
 const sections = ref([])
 const students = ref([])
-const studentInvoices = ref([]) // কালেকশন ট্যাবের জন্য
-const allInvoices = ref([]) // হিস্ট্রি ট্যাবের জন্য (সব ডাটা)
-const loading = ref(false)
+const studentInvoices = ref([])
+const allInvoices = ref([])
+const selectedReceipt = ref(null) // ✅ প্রিন্ট করার জন্য সিলেক্ট করা ইনভয়েস
 
 // Forms
 const newFeeType = ref({ name: '', amount: '' })
@@ -34,7 +34,7 @@ const invoiceForm = ref({
 const collectionFilter = ref({ class_id: '', section_id: '', student_id: '' })
 const paymentForm = ref({ invoice_id: null, amount: '', method: 'Cash' })
 
-// ১. ডাটা লোড
+// ডাটা লোড
 const loadInitialData = async () => {
   try {
     const [ftRes, clsRes] = await Promise.all([
@@ -59,7 +59,7 @@ const loadStudents = async (sectionId) => {
   students.value = res.data.data
 }
 
-// --- TAB 1: FEE SETUP ---
+// Actions
 const createFeeType = async () => {
   try {
     await axios.post(`${BASE_URL}/accounts/fee-types`, newFeeType.value, apiConfig)
@@ -67,28 +67,22 @@ const createFeeType = async () => {
     newFeeType.value = { name: '', amount: '' }
     loadInitialData()
   } catch (e) {
-    Swal.fire('Error', 'Failed to create fee type', 'error')
+    Swal.fire('Error', 'Failed', 'error')
   }
 }
 
-// --- TAB 2: GENERATE INVOICE ---
 const generateInvoice = async () => {
   try {
     await axios.post(`${BASE_URL}/accounts/invoices`, invoiceForm.value, apiConfig)
     Swal.fire('Success', 'Invoice generated!', 'success')
   } catch (e) {
-    if (e.response && e.response.data) {
-      Swal.fire('Error', e.response.data.message, 'error')
-    } else {
-      Swal.fire('Error', 'Failed to generate invoice', 'error')
-    }
+    if (e.response && e.response.data) Swal.fire('Error', e.response.data.message, 'error')
+    else Swal.fire('Error', 'Failed', 'error')
   }
 }
 
-// --- TAB 3: COLLECTION (Single Student) ---
 const getDues = async () => {
   if (!collectionFilter.value.student_id) return
-  loading.value = true
   try {
     const res = await axios.get(
       `${BASE_URL}/accounts/student/${collectionFilter.value.student_id}/invoices`,
@@ -97,8 +91,6 @@ const getDues = async () => {
     studentInvoices.value = res.data.data
   } catch (e) {
     console.error(e)
-  } finally {
-    loading.value = false
   }
 }
 
@@ -112,7 +104,7 @@ const collectPayment = async () => {
   const { value: formValues } = await Swal.fire({
     title: 'Collect Payment',
     html:
-      `<input id="swal-amount" class="swal2-input" placeholder="Amount" value="${paymentForm.value.amount}">` +
+      `<input id="swal-amount" class="swal2-input" value="${paymentForm.value.amount}">` +
       `<select id="swal-method" class="swal2-input"><option value="Cash">Cash</option><option value="Bkash">Bkash</option></select>`,
     focusConfirm: false,
     preConfirm: () => {
@@ -134,32 +126,35 @@ const collectPayment = async () => {
         },
         apiConfig,
       )
-
-      Swal.fire('Paid!', 'Payment received.', 'success')
-      getDues() // রিফ্রেশ
+      Swal.fire('Paid!', 'Success', 'success')
+      getDues()
     } catch (e) {
-      Swal.fire('Error', e.response.data.message || 'Payment failed', 'error')
+      Swal.fire('Error', e.response.data.message, 'error')
     }
   }
 }
 
-// --- TAB 4: HISTORY (All Invoices) ---
 const loadHistory = async () => {
-  loading.value = true
   try {
     const res = await axios.get(`${BASE_URL}/accounts/history`, apiConfig)
     allInvoices.value = res.data.data
   } catch (e) {
     console.error(e)
-  } finally {
-    loading.value = false
   }
 }
 
-// Function to handle History Tab click safely
+// ✅ History Tab switch logic
 const goToHistory = () => {
   activeTab.value = 'history'
   loadHistory()
+}
+
+// ✅ Money Receipt প্রিন্ট ফাংশন
+const printReceipt = (invoice) => {
+  selectedReceipt.value = invoice
+  setTimeout(() => {
+    window.print()
+  }, 500) // ডাটা লোড হওয়ার জন্য একটু সময় দেওয়া হলো
 }
 
 onMounted(loadInitialData)
@@ -178,19 +173,21 @@ onMounted(loadInitialData)
         <button :class="{ active: activeTab === 'collection' }" @click="activeTab = 'collection'">
           💰 Collect Fee
         </button>
-
         <button :class="{ active: activeTab === 'history' }" @click="goToHistory">
           📜 History & Reports
         </button>
       </div>
     </div>
 
-    <div v-if="activeTab === 'setup'" class="card">
+    <div v-if="activeTab === 'setup'" class="card no-print">
       <h3>Add New Fee Type</h3>
       <div class="form-grid">
-        <input v-model="newFeeType.name" placeholder="Fee Name (e.g. Monthly Fee)" />
-        <input v-model="newFeeType.amount" type="number" placeholder="Default Amount" />
-        <button @click="createFeeType" class="btn-save">Save Fee Type</button>
+        <input v-model="newFeeType.name" placeholder="Name" /><input
+          v-model="newFeeType.amount"
+          type="number"
+          placeholder="Amount"
+        />
+        <button @click="createFeeType" class="btn-save">Save</button>
       </div>
       <table class="table mt-4">
         <thead>
@@ -208,35 +205,31 @@ onMounted(loadInitialData)
       </table>
     </div>
 
-    <div v-if="activeTab === 'invoice'" class="card">
-      <h3>Generate Invoice for Student</h3>
+    <div v-if="activeTab === 'invoice'" class="card no-print">
+      <h3>Generate Invoice</h3>
       <div class="form-grid">
         <select v-model="invoiceForm.class_id" @change="loadSections(invoiceForm.class_id)">
-          <option value="">Select Class</option>
+          <option value="">Class</option>
           <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
         </select>
         <select v-model="invoiceForm.section_id" @change="loadStudents(invoiceForm.section_id)">
-          <option value="">Select Section</option>
+          <option value="">Section</option>
           <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
         </select>
         <select v-model="invoiceForm.student_id">
-          <option value="">Select Student</option>
-          <option v-for="st in students" :key="st.id" :value="st.id">
-            {{ st.name }} (Roll: {{ st.roll_no }})
-          </option>
+          <option value="">Student</option>
+          <option v-for="st in students" :key="st.id" :value="st.id">{{ st.name }}</option>
         </select>
         <select v-model="invoiceForm.fee_type_id">
-          <option value="">Select Fee Type</option>
-          <option v-for="ft in feeTypes" :key="ft.id" :value="ft.id">
-            {{ ft.name }} - {{ ft.amount }}
-          </option>
+          <option value="">Fee Type</option>
+          <option v-for="ft in feeTypes" :key="ft.id" :value="ft.id">{{ ft.name }}</option>
         </select>
         <input v-model="invoiceForm.due_date" type="date" />
-        <button @click="generateInvoice" class="btn-save">Generate Invoice</button>
+        <button @click="generateInvoice" class="btn-save">Generate</button>
       </div>
     </div>
 
-    <div v-if="activeTab === 'collection'" class="card">
+    <div v-if="activeTab === 'collection'" class="card no-print">
       <h3>Collect Fees</h3>
       <div class="filters">
         <select
@@ -244,20 +237,17 @@ onMounted(loadInitialData)
           @change="loadSections(collectionFilter.class_id)"
         >
           <option value="">Class</option>
-          <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
-        <select
+          <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option></select
+        ><select
           v-model="collectionFilter.section_id"
           @change="loadStudents(collectionFilter.section_id)"
         >
           <option value="">Section</option>
-          <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
-        </select>
-        <select v-model="collectionFilter.student_id">
+          <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option></select
+        ><select v-model="collectionFilter.student_id">
           <option value="">Student</option>
-          <option v-for="st in students" :key="st.id" :value="st.id">{{ st.name }}</option>
-        </select>
-        <button @click="getDues" class="btn-search">Find Dues</button>
+          <option v-for="st in students" :key="st.id" :value="st.id">{{ st.name }}</option></select
+        ><button @click="getDues" class="btn-search">Search</button>
       </div>
       <table class="table mt-4" v-if="studentInvoices.length">
         <thead>
@@ -277,15 +267,11 @@ onMounted(loadInitialData)
             <td>{{ inv.due_date }}</td>
             <td>{{ inv.total_amount }}</td>
             <td class="text-green">{{ inv.paid_amount }}</td>
-            <td class="text-red font-bold">{{ inv.due_amount }}</td>
-            <td>
-              <span class="badge" :class="inv.status === 'Paid' ? 'bg-green' : 'bg-red'">{{
-                inv.status
-              }}</span>
-            </td>
+            <td class="text-red">{{ inv.due_amount }}</td>
+            <td>{{ inv.status }}</td>
             <td>
               <button v-if="inv.status !== 'Paid'" @click="openPaymentModal(inv)" class="btn-pay">
-                Pay Now
+                Pay
               </button>
             </td>
           </tr>
@@ -293,19 +279,19 @@ onMounted(loadInitialData)
       </table>
     </div>
 
-    <div v-if="activeTab === 'history'" class="card">
-      <h3>📜 Payment & Invoice History</h3>
-      <button onclick="window.print()" class="btn-search mb-2 no-print">Print Report</button>
+    <div v-if="activeTab === 'history'" class="card no-print">
+      <h3>📜 Payment History</h3>
       <div class="table-responsive">
         <table class="table table-bordered">
           <thead>
             <tr>
               <th>Date</th>
-              <th>Student Name</th>
+              <th>Name</th>
               <th>Roll</th>
               <th>Fee Type</th>
               <th>Amount</th>
               <th>Status</th>
+              <th>Print</th>
             </tr>
           </thead>
           <tbody>
@@ -316,29 +302,85 @@ onMounted(loadInitialData)
               <td>{{ inv.fee_type?.name }}</td>
               <td>{{ inv.total_amount }}</td>
               <td>
-                <span
-                  class="badge"
-                  :class="
-                    inv.status === 'Paid'
-                      ? 'bg-green'
-                      : inv.status === 'Partial'
-                        ? 'bg-yellow'
-                        : 'bg-red'
-                  "
+                <span class="badge" :class="inv.status === 'Paid' ? 'bg-green' : 'bg-red'">{{
+                  inv.status
+                }}</span>
+              </td>
+              <td>
+                <button
+                  v-if="inv.status === 'Paid' || inv.status === 'Partial'"
+                  @click="printReceipt(inv)"
+                  class="btn-print"
                 >
-                  {{ inv.status }}
-                </span>
+                  🖨️ Receipt
+                </button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
+
+    <div v-if="selectedReceipt" class="receipt-container print-only">
+      <div class="receipt-header">
+        <h2>ABC School & College</h2>
+        <p>Dhaka, Bangladesh</p>
+        <h3>Money Receipt</h3>
+      </div>
+      <div class="receipt-body">
+        <div class="row">
+          <p>
+            <strong>Receipt No:</strong> #{{
+              selectedReceipt.payments?.[0]?.transaction_id || selectedReceipt.id
+            }}
+          </p>
+          <p><strong>Date:</strong> {{ new Date().toLocaleDateString() }}</p>
+        </div>
+        <hr />
+        <p><strong>Student Name:</strong> {{ selectedReceipt.student?.user?.name }}</p>
+        <p><strong>Student ID / Roll:</strong> {{ selectedReceipt.student?.roll_no }}</p>
+        <p>
+          <strong>Class:</strong> {{ selectedReceipt.student?.class_id }} (Section:
+          {{ selectedReceipt.student?.section_id }})
+        </p>
+        <hr />
+        <table class="receipt-table">
+          <tr>
+            <th>Description</th>
+            <th>Amount</th>
+          </tr>
+          <tr>
+            <td>{{ selectedReceipt.fee_type?.name }}</td>
+            <td>{{ selectedReceipt.total_amount }}</td>
+          </tr>
+          <tr>
+            <td class="text-right"><strong>Paid Amount</strong></td>
+            <td>
+              <strong>{{ selectedReceipt.paid_amount }}</strong>
+            </td>
+          </tr>
+          <tr>
+            <td class="text-right">Due</td>
+            <td>{{ selectedReceipt.due_amount }}</td>
+          </tr>
+        </table>
+        <div class="payment-info mt-2">
+          <p>
+            <strong>Payment Method:</strong> {{ selectedReceipt.payments?.[0]?.method || 'Cash' }}
+          </p>
+        </div>
+      </div>
+      <div class="receipt-footer">
+        <div class="signature">
+          <p>__________________</p>
+          <p>Accounts Officer</p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Styles remain the same */
 .card {
   background: white !important;
   padding: 20px;
@@ -388,10 +430,11 @@ select {
   border-radius: 5px;
   cursor: pointer;
 }
-.btn-search {
+.btn-search,
+.btn-print {
   background: #333 !important;
   color: white !important;
-  padding: 10px 20px;
+  padding: 5px 15px;
   border: none;
   border-radius: 5px;
   cursor: pointer;
@@ -439,21 +482,55 @@ select {
   padding: 2px 6px;
   border-radius: 4px;
 }
-.bg-yellow {
-  background: #fef9c3;
-  color: #854d0e;
-  padding: 2px 6px;
-  border-radius: 4px;
+
+/* 🔥 Money Receipt Styles */
+@media screen {
+  .print-only {
+    display: none;
+  }
 }
 
 @media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-only,
+  .print-only * {
+    visibility: visible;
+  }
   .no-print {
     display: none !important;
   }
-  .card {
-    box-shadow: none;
-    border: none;
-    padding: 0;
+
+  .print-only {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 20px;
+    border: 1px solid #000;
+  }
+  .receipt-header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .receipt-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  .receipt-table th,
+  .receipt-table td {
+    border: 1px solid #000;
+    padding: 8px;
+  }
+  .text-right {
+    text-align: right;
+  }
+  .receipt-footer {
+    margin-top: 50px;
+    text-align: right;
   }
 }
 </style>

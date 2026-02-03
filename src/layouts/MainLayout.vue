@@ -33,28 +33,46 @@ const handleLogout = () => {
           <RouterLink to="/admin/teachers" class="nav-item" active-class="active">
             <span class="icon">👨‍🏫</span> Teacher List
           </RouterLink>
+
           <RouterLink to="/admin/academic/subjects" class="nav-item" active-class="active">
             <span class="icon">📚</span> Add Subject
           </RouterLink>
+
           <RouterLink to="/admin/routines" class="nav-item" active-class="active">
             <span class="icon">📅</span> Class Routine
           </RouterLink>
-          <router-link to="/admin/attendance/take" class="nav-item">
-            <span class="icon">📝</span>
-            <span class="text">Student Attendance</span>
-          </router-link>
-          <router-link to="/admin/attendance/report" class="nav-item">
+
+          <RouterLink to="/admin/attendance/take" class="nav-item" active-class="active">
+            <span class="icon">📝</span> Student Attendance
+          </RouterLink>
+
+          <RouterLink to="/admin/attendance/report" class="nav-item" active-class="active">
             <span class="icon">📊</span> Attendance Report
+          </RouterLink>
+
+          <RouterLink to="/admin/exam/marks-entry" class="nav-item" active-class="active">
+            <span class="icon">💯</span> Marks Entry
+          </RouterLink>
+
+          <RouterLink to="/admin/exam/list" class="nav-item" active-class="active">
+            <span class="icon">📝</span> Exam List
+          </RouterLink>
+          <router-link
+            to="/report-card"
+            class="nav-item"
+            :class="{ active: $route.path === '/report-card' }"
+          >
+            <span class="icon">📊</span> <span>Report Card</span>
           </router-link>
-          <router-link to="/admin/exam/marks-entry" class="nav-link">
-            <span class="icon">💯</span>Marks Entry
+          <router-link to="/tabulation-sheet" class="nav-item">
+            <span class="icon">📋</span> <span>Tabulation Sheet</span>
           </router-link>
-          <router-link to="/admin/exam/list" class="nav-link">
-            <span class="icon">📝</span>Exam List
+          <router-link to="/fees" class="nav-item" :class="{ active: $route.path === '/fees' }">
+            <span class="icon">💰</span> <span>Fees & Accounts</span>
           </router-link>
 
           <RouterLink to="/admin/settings" class="nav-item" active-class="active">
-            <span class="icon">⚙️</span> GeneralSettings
+            <span class="icon">⚙️</span> General Settings
           </RouterLink>
         </nav>
 
@@ -97,14 +115,6 @@ const handleLogout = () => {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* --- Global Theme Variables --- */
-:root {
-  --bg-dark: #383838;
-  --sidebar-dark: #212121;
-  --purple-accent: #9b51e0;
-  --text-white: #ffffff;
-}
-
 .smart-dashboard {
   min-height: 100vh;
   background-color: #383838;
@@ -115,7 +125,6 @@ const handleLogout = () => {
   flex-direction: column;
 }
 
-/* Top Gradient Bar */
 .top-accent-bar {
   height: 8px;
   background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
@@ -129,7 +138,6 @@ const handleLogout = () => {
   height: calc(100vh - 8px);
 }
 
-/* Sidebar Styles */
 .sidebar {
   width: 260px;
   background-color: #212121;
@@ -142,7 +150,7 @@ const handleLogout = () => {
 
 .brand-section {
   padding: 0 30px;
-  margin-bottom: 50px;
+  margin-bottom: 30px;
 }
 
 .brand-text {
@@ -168,11 +176,12 @@ const handleLogout = () => {
 .nav-menu {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 2px;
+  overflow-y: auto; /* Adds scroll if menu is too long */
 }
 
 .nav-item {
-  padding: 16px 30px;
+  padding: 12px 30px;
   color: #a0a0a0;
   text-decoration: none;
   font-weight: 500;
@@ -188,16 +197,15 @@ const handleLogout = () => {
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* Active State */
 .active {
   background: linear-gradient(90deg, rgba(155, 81, 224, 0.15) 0%, transparent 100%);
-  color: white;
+  color: white !important;
   border-left: 4px solid #9b51e0;
 }
 
 .sidebar-footer {
   margin-top: auto;
-  padding: 30px;
+  padding: 20px 30px;
 }
 
 .logout-btn {
@@ -217,7 +225,6 @@ const handleLogout = () => {
   color: #ff6b6b;
 }
 
-/* Main Content Area */
 .main-content {
   flex: 1;
   display: flex;
@@ -229,7 +236,6 @@ const handleLogout = () => {
   position: relative;
 }
 
-/* Header */
 .top-header {
   padding: 20px 40px;
   display: flex;
@@ -249,14 +255,13 @@ const handleLogout = () => {
   gap: 15px;
 }
 
-/* Search Box */
 .search-box {
   background: white;
   border-radius: 50px;
-  padding: 10px 20px;
+  padding: 8px 18px;
   display: flex;
   align-items: center;
-  width: 280px;
+  width: 250px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
@@ -270,44 +275,38 @@ const handleLogout = () => {
 
 .search-icon {
   color: #666;
-  font-size: 0.9rem;
 }
 
 .notif-btn {
   background: white;
   border: none;
   border-radius: 50%;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   cursor: pointer;
   transition: 0.2s;
 }
 
-.notif-btn:hover {
-  transform: scale(1.05);
-}
-
-/* Profile Pill */
 .profile-pill {
   background: white;
   border-radius: 50px;
-  padding: 5px 20px 5px 5px;
+  padding: 4px 15px 4px 4px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   color: #333;
   font-weight: 700;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .avatar-circle {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   background: linear-gradient(135deg, #6a11cb, #2575fc);
   color: white;
   border-radius: 50%;
@@ -317,18 +316,15 @@ const handleLogout = () => {
   font-weight: bold;
 }
 
-/* Scroll Area */
 .content-scroll-area {
   padding: 10px 40px 40px 40px;
   overflow-y: auto;
   height: 100%;
 }
 
-/* Responsive */
 @media (max-width: 1024px) {
   .sidebar {
     width: 80px;
-    padding: 20px 0;
     align-items: center;
   }
   .brand-text,
@@ -336,13 +332,9 @@ const handleLogout = () => {
   .logout-btn {
     display: none;
   }
-  .brand-section {
-    padding: 0;
-    margin-bottom: 20px;
-  }
   .nav-item {
-    padding: 15px;
     justify-content: center;
+    padding: 15px;
   }
   .active {
     border-left: none;

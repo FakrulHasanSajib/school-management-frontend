@@ -10,7 +10,6 @@ import StudentDetailsView from '@/views/StudentDetailsView.vue'
 import TeacherCreateView from '@/views/TeacherCreateView.vue'
 import TeacherEditView from '@/views/TeacherEditView.vue'
 import TeacherProfileView from '@/views/TeacherProfileView.vue'
-
 import RoutineCreateView from '@/views/RoutineCreateView.vue'
 import SubjectCreateView from '@/views/SubjectCreateView.vue'
 import RoutineListView from '@/views/RoutineListView.vue'
@@ -23,6 +22,10 @@ import AttendancePrint from '@/views/AttendancePrint.vue'
 import GeneralSettings from '@/views/GeneralSettings.vue'
 import ExamList from '@/views/ExamList.vue'
 import MarksEntry from '@/views/MarksEntry.vue'
+import ReportCard from '../views/ReportCard.vue'
+import TabulationSheet from '../views/TabulationSheet.vue'
+// ✅ New Import
+import Fees from '../views/Fees.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -32,10 +35,10 @@ const router = createRouter({
       name: 'login',
       component: LoginView,
     },
-    // Protected Routes (যেখানে লেআউট লাগবে)
+    // Protected Routes (Layout Required)
     {
       path: '/admin',
-      component: MainLayout, // প্যারেন্ট লেআউট
+      component: MainLayout,
       children: [
         {
           path: 'dashboard',
@@ -124,7 +127,7 @@ const router = createRouter({
           meta: { requiresAuth: true },
         },
         {
-          path: '/attendance/print-report', // এটি প্রিন্ট পেজ, তাই /admin ছাড়া রাখা হয়েছে (আগের মতোই)
+          path: '/attendance/print-report',
           name: 'AttendancePrint',
           component: () => import('../views/AttendancePrint.vue'),
           meta: { requiresAuth: true },
@@ -135,8 +138,6 @@ const router = createRouter({
           component: () => import('../views/GeneralSettings.vue'),
           meta: { requiresAuth: true },
         },
-
-        // ✅ ফিক্সড: আপনার বাকি রাউটগুলোর মতো /admin দিয়ে শুরু করা হলো
         {
           path: '/admin/exam/list',
           name: 'ExamList',
@@ -147,6 +148,25 @@ const router = createRouter({
           path: '/admin/exam/marks-entry',
           name: 'MarksEntry',
           component: () => import('../views/MarksEntry.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/report-card',
+          name: 'ReportCard',
+          component: ReportCard,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/tabulation-sheet',
+          name: 'TabulationSheet', // Added name for consistency
+          component: TabulationSheet,
+          meta: { requiresAuth: true },
+        },
+        // ✅ New Fees Route
+        {
+          path: '/fees',
+          name: 'Fees',
+          component: Fees,
           meta: { requiresAuth: true },
         },
       ],

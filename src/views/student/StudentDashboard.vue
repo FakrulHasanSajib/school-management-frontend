@@ -1,41 +1,20 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import Swal from 'sweetalert2' // শুধু ক্লিন করার জন্য ইমপোর্ট করা হলো
-import { useRouter } from 'vue-router'
+import Swal from 'sweetalert2'
 
-const router = useRouter()
-const BASE_URL =
-  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://127.0.0.1:8000/api'
-    : '/api'
+const BASE_URL = 'http://127.0.0.1:8000/api'
 const token = localStorage.getItem('token')
 const apiConfig = { headers: { Authorization: `Bearer ${token}` } }
 
 const studentInfo = ref({
   name: 'Student',
-  class: '...',
+  class: 'Loading...',
   roll: '...',
-  section: '...',
-  attendance_status: '...',
+  section: '',
+  attendance_status: 'Present',
   due_fees: 0,
-  must_change_password: false,
 })
-
-// ✅ ক্লিনআপ ফাংশন: এটি আটকে থাকা পপ-আপ ডিলিট করবে
-const forceCleanup = () => {
-  // ১. সুইট এলার্ট অফিসিয়ালি বন্ধ করা
-  Swal.close()
-
-  // ২. যদি তাও থেকে যায়, জোর করে DOM থেকে রিমুভ করা
-  const zombies = document.querySelectorAll('.swal2-container')
-  zombies.forEach((el) => el.remove())
-
-  // ৩. বডি আনলক করা
-  document.body.classList.remove('swal2-shown', 'swal2-height-auto')
-  document.body.style.overflow = 'auto'
-  document.body.style.height = 'auto'
-}
 
 const checkUserStatus = async () => {
   try {
@@ -43,38 +22,97 @@ const checkUserStatus = async () => {
     const user = res.data.data
 
     studentInfo.value.name = user.name
-    studentInfo.value.class = user.class_name || '...'
-    studentInfo.value.roll = user.roll_no || '...'
-    studentInfo.value.section = user.section_name || '...'
 
+    // প্রোফাইল ডাটা সেট করা
+    const profile = user.student_profile || user.studentProfile
+    if (profile) {
+      studentInfo.value.roll = profile.roll_no
+      studentInfo.value.class = profile.school_class?.name || 'N/A'
+      studentInfo.value.section = profile.section?.name || ''
+    } else {
+      studentInfo.value.class = 'Profile Missing'
+    }
+
+    // ✅ যদি পাসওয়ার্ড চেঞ্জ দরকার হয়, পপ-আপ দেখাবে
     if (user.must_change_password) {
-      studentInfo.value.must_change_password = true
+      showChangePasswordModal()
     }
   } catch (error) {
-    console.error('User fetch error', error)
+    console.error('Dashboard Error:', error)
+    studentInfo.value.class = 'Error'
   }
 }
 
-onMounted(() => {
-  forceCleanup() // ✅ মাউন্ট হওয়ার সাথে সাথে পুরানো জঞ্জাল পরিষ্কার করবে
-  checkUserStatus()
-})
+// ✅ পপ-আপ ফাংশন (Strong CSS & Events Fix)
+const showChangePasswordModal = async () => {
+  await Swal.fire({
+    title: '⚠️ পাসওয়ার্ড পরিবর্তন করুন',
+    text: 'নিরাপত্তার জন্য আপনার ডিফল্ট পাসওয়ার্ড পরিবর্তন করুন।',
+    icon: 'warning',
+    // ইনপুট ফিল্ড
+    html: `
+      <div style="text-align: left; z-index: 999999;">
+        <label style="color: #333; font-weight: bold;">New Password</label>
+        <input id="swal-pass" type="password" class="swal2-input custom-input" placeholder="New Password">
 
-// পেজ ছেড়ে যাওয়ার সময়ও ক্লিন করবে
-onUnmounted(() => {
-  forceCleanup()
+        <label style="color: #333; font-weight: bold;">Confirm Password</label>
+        <input id="swal-confirm" type="password" class="swal2-input custom-input" placeholder="Confirm Password">
+      </div>
+    `,
+    showCancelButton: true,
+    cancelButtonText: 'পরে করব', // ❌ কেটে দেওয়ার বাটন
+    confirmButtonText: 'চেঞ্জ করুন',
+    confirmButtonColor: '#4f46e5',
+    cancelButtonColor: '#d33',
+    background: '#ffffff', // সাদা ব্যাকগ্রাউন্ড
+    allowOutsideClick: true, // ✅ বাইরে ক্লিক করলে কাটবে
+    allowEscapeKey: true, // ✅ Esc চাপলে কাটবে
+    width: '400px',
+
+    // ✅ ফোকাস এবং ক্লিক ফিক্স
+    didOpen: () => {
+      // জোর করে ফোকাস আনা
+      const popup = Swal.getPopup()
+      if (popup) {
+        popup.style.pointerEvents = 'auto' // ক্লিক এনাবল
+      }
+      const input = document.getElementById('swal-pass')
+      if (input) input.focus()
+    },
+
+    preConfirm: async () => {
+      const pass = document.getElementById('swal-pass').value
+      const confirm = document.getElementById('swal-confirm').value
+
+      if (!pass || !confirm) return Swal.showValidationMessage('উভয় ফিল্ড পূরণ করুন')
+      if (pass.length < 6) return Swal.showValidationMessage('কমপক্ষে ৬ সংখ্যা দিন')
+      if (pass !== confirm) return Swal.showValidationMessage('পাসওয়ার্ড মিলছে না')
+
+      try {
+        await axios.post(
+          `${BASE_URL}/change-password`,
+          {
+            new_password: pass,
+            new_password_confirmation: confirm,
+          },
+          apiConfig,
+        )
+      } catch (error) {
+        Swal.showValidationMessage(error.response?.data?.message || 'Error')
+      }
+    },
+  }).then((result) => {
+    if (result.isConfirmed) Swal.fire('সফল!', 'পাসওয়ার্ড আপডেট হয়েছে', 'success')
+  })
+}
+
+onMounted(() => {
+  checkUserStatus()
 })
 </script>
 
 <template>
   <div class="student-dashboard">
-    <div v-if="studentInfo.must_change_password" class="alert-banner">
-      <div class="alert-content">
-        <span>⚠️ <strong>Security Alert:</strong> আপনার পাসওয়ার্ড পরিবর্তন করা জরুরি।</span>
-        <router-link to="/student/change-password" class="alert-btn"> Change Now </router-link>
-      </div>
-    </div>
-
     <div class="header mb-4">
       <h2 class="text-white">Student Dashboard</h2>
       <p class="text-gray">Welcome back, {{ studentInfo.name }}! 👋</p>
@@ -84,17 +122,22 @@ onUnmounted(() => {
       <div class="stat-card gradient-1">
         <div class="icon-box">🏫</div>
         <div>
-          <p class="stat-label">Class</p>
-          <h3 class="stat-value">{{ studentInfo.class }}</h3>
+          <p class="stat-label">Class & Section</p>
+          <h3 class="stat-value">
+            {{ studentInfo.class }}
+            <span v-if="studentInfo.section">({{ studentInfo.section }})</span>
+          </h3>
         </div>
       </div>
+
       <div class="stat-card gradient-2">
         <div class="icon-box">🆔</div>
         <div>
-          <p class="stat-label">Roll</p>
+          <p class="stat-label">Roll Number</p>
           <h3 class="stat-value">{{ studentInfo.roll }}</h3>
         </div>
       </div>
+
       <div class="stat-card gradient-3">
         <div class="icon-box">📅</div>
         <div>
@@ -102,10 +145,11 @@ onUnmounted(() => {
           <h3 class="stat-value">{{ studentInfo.attendance_status }}</h3>
         </div>
       </div>
+
       <div class="stat-card gradient-4">
         <div class="icon-box">💰</div>
         <div>
-          <p class="stat-label">Due</p>
+          <p class="stat-label">Due Fees</p>
           <h3 class="stat-value">৳ {{ studentInfo.due_fees }}</h3>
         </div>
       </div>
@@ -114,9 +158,8 @@ onUnmounted(() => {
     <div class="recent-section mt-section">
       <h3>📌 Quick Links</h3>
       <div class="quick-links">
-        <router-link to="/student/routine" class="btn-link">📅 Routine</router-link>
-        <router-link to="/student/results" class="btn-link">📊 Result</router-link>
-        <router-link to="/student/fees" class="btn-link">💳 Pay Fees</router-link>
+        <router-link to="/student/routine" class="btn-link">📅 Class Routine</router-link>
+        <router-link to="/student/results" class="btn-link">📊 Exam Result</router-link>
         <router-link to="/student/change-password" class="btn-link change-pass-btn"
           >🔒 Change Password</router-link
         >
@@ -126,42 +169,10 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ✅ আগের সব CSS বাদ দিয়ে ক্লিন স্টাইল */
+/* ড্যাশবোর্ড স্টাইল */
 .student-dashboard {
   padding-bottom: 50px;
 }
-
-/* Alert Banner */
-.alert-banner {
-  background-color: #ef4444;
-  color: white;
-  padding: 15px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
-}
-.alert-content {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  align-items: center;
-}
-.alert-btn {
-  background: white;
-  color: #ef4444;
-  padding: 8px 15px;
-  border-radius: 5px;
-  text-decoration: none;
-  font-weight: bold;
-  font-size: 14px;
-}
-.alert-btn:hover {
-  background: #f9fafb;
-}
-
-/* Text & Grid */
 .text-white {
   color: white;
   margin-bottom: 5px;
@@ -179,8 +190,6 @@ onUnmounted(() => {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 20px;
 }
-
-/* Cards */
 .stat-card {
   padding: 25px;
   border-radius: 15px;
@@ -188,7 +197,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 15px;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 .gradient-1 {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -200,15 +209,9 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
   color: #fff;
 }
-.gradient-3 .stat-label,
-.gradient-3 .stat-value {
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
 .gradient-4 {
   background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
 }
-
 .icon-box {
   background: rgba(255, 255, 255, 0.25);
   width: 50px;
@@ -229,8 +232,6 @@ onUnmounted(() => {
   font-size: 22px;
   font-weight: bold;
 }
-
-/* Buttons */
 .recent-section {
   background: #1e1e2d;
   padding: 25px;
@@ -248,21 +249,58 @@ onUnmounted(() => {
   padding: 15px 25px;
   border-radius: 10px;
   text-decoration: none;
-  font-weight: 500;
-  border: 1px solid #3b3b5c;
   transition: 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #3b3b5c;
 }
 .btn-link:hover {
   background: #3699ff;
   color: white;
   border-color: #3699ff;
+  transform: translateY(-2px);
 }
 .change-pass-btn {
-  border-color: #f59e0b;
+  border: 1px solid #f59e0b;
   color: #f59e0b;
 }
 .change-pass-btn:hover {
   background: #f59e0b;
   color: white;
+}
+</style>
+
+<style>
+/* ১. SweetAlert কন্টেইনারকে সবকিছুর উপরে রাখা */
+.swal2-container {
+  z-index: 2000000 !important; /* সবার উপরে */
+  pointer-events: auto !important; /* মাউস ক্লিক এনাবল */
+}
+
+/* ২. পপ-আপ বডি */
+.swal2-popup {
+  background: white !important; /* সাদা ব্যাকগ্রাউন্ড */
+  opacity: 1 !important; /* দৃশ্যমান */
+  pointer-events: auto !important;
+}
+
+/* ৩. ইনপুট ফিল্ড ফিক্স */
+.custom-input {
+  background: white !important;
+  color: black !important;
+  border: 1px solid #ccc !important;
+  margin-bottom: 10px;
+  width: 100%;
+  height: 40px;
+  padding: 5px;
+  display: block !important;
+  opacity: 1 !important;
+}
+
+/* ৪. ইনপুটে ফোকাস */
+.custom-input:focus {
+  border-color: #4f46e5 !important;
+  outline: none;
 }
 </style>

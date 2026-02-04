@@ -30,6 +30,9 @@ import Fees from '../views/Fees.vue'
 import StudentLayout from '../layouts/StudentLayout.vue'
 import StudentDashboard from '../views/student/StudentDashboard.vue'
 import StudentChangePassword from '../views/student/StudentChangePassword.vue'
+import StudentRoutine from '../views/student/StudentRoutine.vue'
+import StudentResults from '../views/student/StudentResults.vue'
+import StudentFees from '../views/student/StudentFees.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -189,6 +192,9 @@ const router = createRouter({
         },
         // ভবিষ্যতে রুটিন, রেজাল্ট ইত্যাদি এখানে যোগ হবে
         { path: 'change-password', component: StudentChangePassword },
+        { path: 'routine', component: StudentRoutine },
+        { path: 'results', component: StudentResults },
+        { path: 'fees', component: StudentFees },
       ],
     },
   ],

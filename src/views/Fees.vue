@@ -11,7 +11,7 @@ const token = localStorage.getItem('token')
 const apiConfig = { headers: { Authorization: `Bearer ${token}` } }
 
 // Tabs
-const activeTab = ref('collection')
+const activeTab = ref('setup')
 
 // States
 const feeTypes = ref([])
@@ -20,10 +20,13 @@ const sections = ref([])
 const students = ref([])
 const studentInvoices = ref([])
 const allInvoices = ref([])
-const selectedReceipt = ref(null) // ✅ প্রিন্ট করার জন্য সিলেক্ট করা ইনভয়েস
+const selectedReceipt = ref(null)
 
 // Forms
-const newFeeType = ref({ name: '', amount: '' })
+const newFeeType = ref({ name: '', amount: '', due_date: '' })
+const isEditing = ref(false) // ✅ এডিট মোড ট্র্যাকার
+const editId = ref(null) // ✅ কোন ফি এডিট হচ্ছে তার আইডি
+
 const invoiceForm = ref({
   class_id: '',
   section_id: '',
@@ -59,15 +62,69 @@ const loadStudents = async (sectionId) => {
   students.value = res.data.data
 }
 
-// Actions
-const createFeeType = async () => {
+// ✅ ফি তৈরি অথবা আপডেট করার ফাংশন
+const saveFeeType = async () => {
+  if (!newFeeType.value.name || !newFeeType.value.amount) {
+    Swal.fire('Warning', 'Name and Amount are required', 'warning')
+    return
+  }
+
   try {
-    await axios.post(`${BASE_URL}/accounts/fee-types`, newFeeType.value, apiConfig)
-    Swal.fire('Success', 'Fee type created!', 'success')
-    newFeeType.value = { name: '', amount: '' }
-    loadInitialData()
+    if (isEditing.value) {
+      // আপডেট রিকোয়েস্ট (PUT)
+      await axios.put(`${BASE_URL}/accounts/fee-types/${editId.value}`, newFeeType.value, apiConfig)
+      Swal.fire('Updated!', 'Fee type updated successfully.', 'success')
+    } else {
+      // নতুন তৈরি রিকোয়েস্ট (POST)
+      await axios.post(`${BASE_URL}/accounts/fee-types`, newFeeType.value, apiConfig)
+      Swal.fire('Created!', 'Fee type created successfully.', 'success')
+    }
+
+    cancelEdit() // ফর্ম রিসেট
+    loadInitialData() // লিস্ট রিফ্রেশ
   } catch (e) {
-    Swal.fire('Error', 'Failed', 'error')
+    Swal.fire('Error', 'Operation failed', 'error')
+  }
+}
+
+// ✅ এডিট মোড চালু করা
+const editFeeType = (fee) => {
+  newFeeType.value = {
+    name: fee.name,
+    amount: fee.amount,
+    due_date: fee.due_date || '',
+  }
+  editId.value = fee.id
+  isEditing.value = true
+}
+
+// ✅ এডিট বাতিল করা
+const cancelEdit = () => {
+  newFeeType.value = { name: '', amount: '', due_date: '' }
+  isEditing.value = false
+  editId.value = null
+}
+
+// ✅ ফি ডিলিট করা
+const deleteFeeType = async (id) => {
+  const confirm = await Swal.fire({
+    title: 'Are you sure?',
+    text: "You won't be able to revert this!",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Yes, delete it!',
+  })
+
+  if (confirm.isConfirmed) {
+    try {
+      await axios.delete(`${BASE_URL}/accounts/fee-types/${id}`, apiConfig)
+      Swal.fire('Deleted!', 'Fee type has been deleted.', 'success')
+      loadInitialData()
+    } catch (e) {
+      Swal.fire('Error', 'Failed to delete. It might be in use.', 'error')
+    }
   }
 }
 
@@ -76,8 +133,7 @@ const generateInvoice = async () => {
     await axios.post(`${BASE_URL}/accounts/invoices`, invoiceForm.value, apiConfig)
     Swal.fire('Success', 'Invoice generated!', 'success')
   } catch (e) {
-    if (e.response && e.response.data) Swal.fire('Error', e.response.data.message, 'error')
-    else Swal.fire('Error', 'Failed', 'error')
+    Swal.fire('Error', 'Failed', 'error')
   }
 }
 
@@ -143,18 +199,16 @@ const loadHistory = async () => {
   }
 }
 
-// ✅ History Tab switch logic
 const goToHistory = () => {
   activeTab.value = 'history'
   loadHistory()
 }
 
-// ✅ Money Receipt প্রিন্ট ফাংশন
 const printReceipt = (invoice) => {
   selectedReceipt.value = invoice
   setTimeout(() => {
     window.print()
-  }, 500) // ডাটা লোড হওয়ার জন্য একটু সময় দেওয়া হলো
+  }, 500)
 }
 
 onMounted(loadInitialData)
@@ -180,26 +234,59 @@ onMounted(loadInitialData)
     </div>
 
     <div v-if="activeTab === 'setup'" class="card no-print">
-      <h3>Add New Fee Type</h3>
+      <h3>{{ isEditing ? 'Edit Fee Type' : 'Add New Fee Type' }}</h3>
+
       <div class="form-grid">
-        <input v-model="newFeeType.name" placeholder="Name" /><input
-          v-model="newFeeType.amount"
-          type="number"
-          placeholder="Amount"
-        />
-        <button @click="createFeeType" class="btn-save">Save</button>
+        <div class="form-group">
+          <label>Fee Name</label>
+          <input v-model="newFeeType.name" placeholder="e.g. Monthly Fee" />
+        </div>
+        <div class="form-group">
+          <label>Amount</label>
+          <input v-model="newFeeType.amount" type="number" placeholder="500" />
+        </div>
+        <div class="form-group">
+          <label>Due Date (Optional)</label>
+          <input v-model="newFeeType.due_date" type="date" />
+        </div>
+
+        <div
+          class="form-group button-group"
+          style="display: flex; align-items: flex-end; gap: 10px"
+        >
+          <button
+            @click="saveFeeType"
+            :class="isEditing ? 'btn-update' : 'btn-save'"
+            style="flex: 1"
+          >
+            {{ isEditing ? 'Update Fee' : 'Save Fee' }}
+          </button>
+          <button v-if="isEditing" @click="cancelEdit" class="btn-cancel" style="flex: 1">
+            Cancel
+          </button>
+        </div>
       </div>
+
       <table class="table mt-4">
         <thead>
           <tr>
             <th>Name</th>
             <th>Amount</th>
+            <th>Due Date</th>
+            <th class="text-center">Action</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="ft in feeTypes" :key="ft.id">
             <td>{{ ft.name }}</td>
             <td>{{ ft.amount }}</td>
+            <td>{{ ft.due_date || 'N/A' }}</td>
+            <td class="text-center">
+              <button @click="editFeeType(ft)" class="btn-icon btn-edit" title="Edit">✏️</button>
+              <button @click="deleteFeeType(ft.id)" class="btn-icon btn-delete" title="Delete">
+                🗑️
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -224,7 +311,7 @@ onMounted(loadInitialData)
           <option value="">Fee Type</option>
           <option v-for="ft in feeTypes" :key="ft.id" :value="ft.id">{{ ft.name }}</option>
         </select>
-        <input v-model="invoiceForm.due_date" type="date" />
+        <input v-model="invoiceForm.due_date" type="date" placeholder="Due Date" />
         <button @click="generateInvoice" class="btn-save">Generate</button>
       </div>
     </div>
@@ -237,17 +324,20 @@ onMounted(loadInitialData)
           @change="loadSections(collectionFilter.class_id)"
         >
           <option value="">Class</option>
-          <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option></select
-        ><select
+          <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
+        </select>
+        <select
           v-model="collectionFilter.section_id"
           @change="loadStudents(collectionFilter.section_id)"
         >
           <option value="">Section</option>
-          <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option></select
-        ><select v-model="collectionFilter.student_id">
+          <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
+        </select>
+        <select v-model="collectionFilter.student_id">
           <option value="">Student</option>
-          <option v-for="st in students" :key="st.id" :value="st.id">{{ st.name }}</option></select
-        ><button @click="getDues" class="btn-search">Search</button>
+          <option v-for="st in students" :key="st.id" :value="st.id">{{ st.name }}</option>
+        </select>
+        <button @click="getDues" class="btn-search">Search</button>
       </div>
       <table class="table mt-4" v-if="studentInvoices.length">
         <thead>
@@ -345,24 +435,28 @@ onMounted(loadInitialData)
         </p>
         <hr />
         <table class="receipt-table">
-          <tr>
-            <th>Description</th>
-            <th>Amount</th>
-          </tr>
-          <tr>
-            <td>{{ selectedReceipt.fee_type?.name }}</td>
-            <td>{{ selectedReceipt.total_amount }}</td>
-          </tr>
-          <tr>
-            <td class="text-right"><strong>Paid Amount</strong></td>
-            <td>
-              <strong>{{ selectedReceipt.paid_amount }}</strong>
-            </td>
-          </tr>
-          <tr>
-            <td class="text-right">Due</td>
-            <td>{{ selectedReceipt.due_amount }}</td>
-          </tr>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ selectedReceipt.fee_type?.name }}</td>
+              <td>{{ selectedReceipt.total_amount }}</td>
+            </tr>
+            <tr>
+              <td class="text-right"><strong>Paid Amount</strong></td>
+              <td>
+                <strong>{{ selectedReceipt.paid_amount }}</strong>
+              </td>
+            </tr>
+            <tr>
+              <td class="text-right">Due</td>
+              <td>{{ selectedReceipt.due_amount }}</td>
+            </tr>
+          </tbody>
         </table>
         <div class="payment-info mt-2">
           <p>
@@ -381,6 +475,7 @@ onMounted(loadInitialData)
 </template>
 
 <style scoped>
+/* Common Card Styles */
 .card {
   background: white !important;
   padding: 20px;
@@ -407,11 +502,24 @@ onMounted(loadInitialData)
   background: #2563eb;
   color: white;
 }
+
+/* Form Styles */
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 15px;
   margin-top: 15px;
+  align-items: flex-start;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.form-group label {
+  font-size: 14px;
+  font-weight: bold;
+  color: #555;
 }
 input,
 select {
@@ -422,8 +530,26 @@ select {
   background: #fff !important;
   color: #000 !important;
 }
+
+/* Buttons */
 .btn-save {
   background: #2563eb !important;
+  color: white !important;
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.btn-update {
+  background: #d97706 !important;
+  color: white !important;
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.btn-cancel {
+  background: #6b7280 !important;
   color: white !important;
   padding: 10px;
   border: none;
@@ -447,6 +573,27 @@ select {
   border-radius: 5px;
   cursor: pointer;
 }
+
+/* Action Buttons */
+.btn-icon {
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
+  margin: 0 5px;
+  transition: transform 0.2s;
+}
+.btn-icon:hover {
+  transform: scale(1.2);
+}
+.btn-edit {
+  color: #d97706;
+}
+.btn-delete {
+  color: #dc2626;
+}
+
+/* Table */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -464,6 +611,11 @@ select {
   background: #f8fafc !important;
   font-weight: bold;
 }
+.text-center {
+  text-align: center !important;
+}
+
+/* Status Colors */
 .text-red {
   color: red !important;
 }
@@ -483,13 +635,12 @@ select {
   border-radius: 4px;
 }
 
-/* 🔥 Money Receipt Styles */
+/* Print Styles */
 @media screen {
   .print-only {
     display: none;
   }
 }
-
 @media print {
   body * {
     visibility: hidden;
@@ -501,7 +652,6 @@ select {
   .no-print {
     display: none !important;
   }
-
   .print-only {
     display: block !important;
     position: absolute;

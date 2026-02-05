@@ -40,40 +40,25 @@ const stats = ref({
   total_students: 0,
   total_teachers: 0,
   total_income: 0,
+  total_expense: 0, // ✅ নতুন: খরচ
+  net_balance: 0, // ✅ নতুন: ব্যালেন্স
   todays_present: 0,
 })
 const recentPayments = ref([])
 const loading = ref(true)
-const chartsLoaded = ref(false) // চার্ট লোড হওয়ার আগে দেখাবো না
+const chartsLoaded = ref(false)
 
 // Chart Data (Reactive)
-const incomeChartData = ref({
-  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-  datasets: [
-    {
-      label: 'Income (Tk)',
-      backgroundColor: '#3b82f6',
-      data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // ডিফল্ট ভ্যালু
-      borderRadius: 5,
-    },
-  ],
-})
+const incomeChartData = ref(null)
+const attendanceChartData = ref(null)
 
-const attendanceChartData = ref({
-  labels: ['Present', 'Absent', 'Late'],
-  datasets: [
-    {
-      backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
-      data: [0, 0, 0], // ডিফল্ট ভ্যালু
-    },
-  ],
-})
-
-// Options
+// Options (Legend টপে দেওয়া হয়েছে যাতে ইনকাম/খরচ বোঝা যায়)
 const incomeChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
+  plugins: {
+    legend: { position: 'top' },
+  },
 }
 const attendanceChartOptions = {
   responsive: true,
@@ -91,15 +76,21 @@ const loadDashboardData = async () => {
       // ২. রিসেন্ট পেমেন্ট আপডেট
       recentPayments.value = res.data.data.recent_payments
 
-      // ৩. ইনকাম চার্ট আপডেট (Dynamic)
+      // ৩. ইনকাম vs এক্সপেন্স চার্ট আপডেট (Dynamic)
       incomeChartData.value = {
         labels: res.data.data.chart_data.months,
         datasets: [
           {
-            label: 'Income (Tk)',
-            backgroundColor: '#3b82f6',
+            label: 'Income',
+            backgroundColor: '#3b82f6', // নীল
             data: res.data.data.chart_data.income,
-            borderRadius: 5,
+            borderRadius: 4,
+          },
+          {
+            label: 'Expense',
+            backgroundColor: '#ef4444', // লাল
+            data: res.data.data.chart_data.expense, // ✅ ব্যাকএন্ড থেকে আসা খরচের ডাটা
+            borderRadius: 4,
           },
         ],
       }
@@ -133,27 +124,19 @@ onMounted(() => {
   <div class="dashboard-container">
     <div class="header mb-4">
       <h2 class="text-white">Admin Dashboard</h2>
-      <p class="text-gray">Welcome back, here's what's happening today.</p>
+      <p class="text-gray">Overview of school finances and attendance.</p>
     </div>
 
     <div class="stats-grid">
       <div class="stat-card gradient-1">
         <div class="icon-box">👨‍🎓</div>
         <div>
-          <p class="stat-label">Total Students</p>
+          <p class="stat-label">Students</p>
           <h3 class="stat-value">{{ loading ? '...' : stats.total_students }}</h3>
         </div>
       </div>
 
       <div class="stat-card gradient-2">
-        <div class="icon-box">👨‍🏫</div>
-        <div>
-          <p class="stat-label">Total Teachers</p>
-          <h3 class="stat-value">{{ loading ? '...' : stats.total_teachers }}</h3>
-        </div>
-      </div>
-
-      <div class="stat-card gradient-3">
         <div class="icon-box">💰</div>
         <div>
           <p class="stat-label">Total Income</p>
@@ -161,18 +144,26 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="stat-card gradient-4">
-        <div class="icon-box">📊</div>
+      <div class="stat-card gradient-red">
+        <div class="icon-box">💸</div>
         <div>
-          <p class="stat-label">Today's Attendance</p>
-          <h3 class="stat-value">{{ loading ? '...' : stats.todays_present }}</h3>
+          <p class="stat-label">Total Expense</p>
+          <h3 class="stat-value">৳ {{ loading ? '...' : stats.total_expense }}</h3>
+        </div>
+      </div>
+
+      <div class="stat-card gradient-green">
+        <div class="icon-box">🏦</div>
+        <div>
+          <p class="stat-label">Net Balance</p>
+          <h3 class="stat-value">৳ {{ loading ? '...' : stats.net_balance }}</h3>
         </div>
       </div>
     </div>
 
     <div class="charts-grid mt-section">
       <div class="chart-card">
-        <h4>Monthly Income Overview (This Year)</h4>
+        <h4>Cash Flow (Income vs Expense)</h4>
         <div class="chart-container">
           <Bar v-if="chartsLoaded" :data="incomeChartData" :options="incomeChartOptions" />
           <p v-else class="loading-text">Loading Chart...</p>
@@ -245,13 +236,13 @@ onMounted(() => {
 }
 .mt-section {
   margin-top: 30px;
-} /* ✅ Fix: সেকশনগুলোর মাঝে গ্যাপ বাড়ানো হয়েছে */
+}
 
 /* 1. Stats Grid */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 25px; /* ✅ Fix: কার্ডগুলোর মাঝে গ্যাপ বাড়ানো হয়েছে */
+  gap: 25px;
 }
 
 .stat-card {
@@ -261,7 +252,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 15px;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15); /* শ্যাডো বাড়ানো হয়েছে */
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
   transition: transform 0.3s ease;
 }
 .stat-card:hover {
@@ -275,18 +266,14 @@ onMounted(() => {
 .gradient-2 {
   background: linear-gradient(135deg, #2af598 0%, #009efd 100%);
 }
-.gradient-3 {
-  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
-  color: #fff;
-}
-.gradient-3 .stat-label,
-.gradient-3 .stat-value {
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-.gradient-4 {
-  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-}
+
+/* ✅ নতুন কার্ডের স্টাইল */
+.gradient-red {
+  background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+} /* Expense */
+.gradient-green {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+} /* Net Balance */
 
 .icon-box {
   background: rgba(255, 255, 255, 0.25);
@@ -314,7 +301,7 @@ onMounted(() => {
 .charts-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  gap: 25px; /* ✅ Fix: চার্ট কার্ডের মাঝে গ্যাপ */
+  gap: 25px;
 }
 @media (max-width: 900px) {
   .charts-grid {
@@ -435,6 +422,10 @@ onMounted(() => {
 }
 .text-center {
   text-align: center;
+}
+.font-bold {
+  font-weight: bold;
+  color: #fff;
 }
 .py-4 {
   padding-top: 20px;

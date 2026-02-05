@@ -3,31 +3,73 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 
-// .env ফাইল থেকে URL নেওয়া (যদি সেট করা থাকে) অথবা ডিফল্ট লোকালহোস্ট
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api'
+// ✅ সরাসরি ব্যাকএন্ডের API লিংক
+const BASE_URL = 'http://127.0.0.1:8000/api'
 const token = localStorage.getItem('token')
-const apiConfig = { headers: { Authorization: `Bearer ${token}` } }
+
+// ✅ API কনফিগারেশন
+const apiConfig = {
+  headers: {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/json',
+  },
+}
 
 const invoices = ref([])
 const isLoading = ref(false)
 const selectedReceipt = ref(null)
 
-// ১. ফি লোড করা
+// ✅ ১. ফি লোড করা
 const fetchFees = async () => {
   isLoading.value = true
   try {
     // ইউজারের প্রোফাইল থেকে আইডি বের করা
     const profileRes = await axios.get(`${BASE_URL}/profile`, apiConfig)
-    const user = profileRes.data.data
-    // স্টুডেন্ট আইডি খোঁজা (ডাটাবেস স্ট্রাকচার অনুযায়ী)
-    const studentId = user.student_profile?.id || user.studentProfile?.id
 
+    // ডাটা ফরম্যাট হ্যান্ডেল করা
+    const responseData = profileRes.data
+    const user = responseData.data || responseData
+
+    // 🛑 সেফটি চেক: যদি ইউজার না পাওয়া যায়
+    if (!user) {
+      Swal.fire('Error', 'User profile failed to load.', 'error')
+      return
+    }
+
+    // ✅ স্টুডেন্ট আইডি খোঁজা
+    const studentId =
+      user.student_profile?.id ||
+      user.studentProfile?.id ||
+      user.student?.id ||
+      user.student_info?.id
+
+    // যদি আইডি পাওয়া যায়, ইনভয়েস লোড করো
     if (studentId) {
       const res = await axios.get(`${BASE_URL}/accounts/student/${studentId}/invoices`, apiConfig)
-      invoices.value = res.data.data
+      invoices.value = res.data.data || res.data
+    } else {
+      // 🛑 স্টুডেন্ট প্রোফাইল মিসিং হলে
+      Swal.fire({
+        title: '⚠️ Student Profile Missing!',
+        text: 'আপনার অ্যাকাউন্টের সাথে কোনো স্টুডেন্ট প্রোফাইল লিংক করা নেই।',
+        icon: 'warning',
+        confirmButtonText: 'OK',
+      })
     }
   } catch (error) {
-    console.error('Fees Error', error)
+    // যদি সেশন এক্সপায়ার হয় বা অথেনটিকেশন ফেইল করে
+    if (error.response && error.response.status === 401) {
+      Swal.fire({
+        title: 'Session Expired',
+        text: 'Please login again.',
+        icon: 'warning',
+        confirmButtonText: 'Login',
+      }).then(() => {
+        // window.location.href = '/login';
+      })
+    } else {
+      Swal.fire('Error', 'Failed to load fees information.', 'error')
+    }
   } finally {
     isLoading.value = false
   }
@@ -60,11 +102,10 @@ const initiatePayment = async (invoice) => {
       // 🚀 SSLCommerz পেমেন্ট পেজে নিয়ে যাওয়া
       window.location.href = res.data.url
     } else {
-      Swal.fire('Error', 'Payment gateway could not be initiated.', 'error')
+      Swal.fire('Error', res.data.message || 'Payment gateway could not be initiated.', 'error')
     }
   } catch (error) {
-    console.error(error)
-    Swal.fire('Error', 'Something went wrong! Check console.', 'error')
+    Swal.fire('Error', 'Payment initiation failed. Please try again later.', 'error')
   }
 }
 
@@ -112,7 +153,6 @@ onMounted(() => {
       icon: 'success',
       confirmButtonText: 'Download Receipt',
     })
-    // URL থেকে status রিমুভ করা যাতে রিফ্রেশ দিলে আবার না দেখায়
     window.history.replaceState({}, document.title, window.location.pathname)
   } else if (status === 'failed') {
     Swal.fire('Payment Failed', 'Please try again.', 'error')
@@ -189,7 +229,7 @@ onMounted(() => {
     </div>
 
     <div v-else class="empty-state no-print">
-      <p>🎉 কোনো বকেয়া নেই।</p>
+      <p>🎉 কোনো বকেয়া নেই।</p>
     </div>
 
     <div v-if="selectedReceipt" class="receipt-container print-only">
@@ -201,7 +241,10 @@ onMounted(() => {
       <div class="receipt-info">
         <div class="info-left">
           <p><strong>Receipt No:</strong> #{{ selectedReceipt.id }}</p>
-          <p><strong>Student:</strong> {{ selectedReceipt.student?.user?.name }}</p>
+          <p>
+            <strong>Student:</strong>
+            {{ selectedReceipt.student?.user?.name }}
+          </p>
           <p><strong>Roll No:</strong> {{ selectedReceipt.student?.roll_no }}</p>
         </div>
         <div class="info-right">

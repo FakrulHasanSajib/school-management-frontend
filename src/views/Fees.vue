@@ -1,16 +1,14 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 
-const BASE_URL =
-  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://127.0.0.1:8000/api'
-    : '/api'
+// ✅ সার্ভার কনফিগারেশন (লোকালহোস্টের সমস্যা এড়াতে হার্ডকোড রাখা ভালো)
+const BASE_URL = 'http://127.0.0.1:8000/api'
 const token = localStorage.getItem('token')
 const apiConfig = { headers: { Authorization: `Bearer ${token}` } }
 
-// Tabs
+// Tabs Control
 const activeTab = ref('setup')
 
 // States
@@ -24,45 +22,49 @@ const selectedReceipt = ref(null)
 
 // Forms
 const newFeeType = ref({ name: '', amount: '', due_date: '' })
-const isEditing = ref(false) // ✅ এডিট মোড ট্র্যাকার
-const editId = ref(null) // ✅ কোন ফি এডিট হচ্ছে তার আইডি
+const isEditing = ref(false)
+const editId = ref(null)
 
+// ✅ Invoice Form (Amount যুক্ত করা হয়েছে)
 const invoiceForm = ref({
   class_id: '',
   section_id: '',
   student_id: '',
   fee_type_id: '',
-  due_date: '',
+  amount: '', // 🔴 Fixed: Amount field added
+  due_date: new Date().toISOString().substr(0, 10),
 })
+
 const collectionFilter = ref({ class_id: '', section_id: '', student_id: '' })
 const paymentForm = ref({ invoice_id: null, amount: '', method: 'Cash' })
 
-// ডাটা লোড
+// --- ১. ডাটা লোডিং ---
 const loadInitialData = async () => {
   try {
     const [ftRes, clsRes] = await Promise.all([
       axios.get(`${BASE_URL}/accounts/fee-types`, apiConfig),
       axios.get(`${BASE_URL}/academic/classes`, apiConfig),
     ])
-    feeTypes.value = ftRes.data.data
-    classes.value = clsRes.data.data
+    feeTypes.value = ftRes.data.data || ftRes.data
+    classes.value = clsRes.data.data || clsRes.data
   } catch (error) {
-    console.error(error)
+    console.error('Initial Load Error:', error)
   }
 }
 
 const loadSections = async (classId) => {
   if (!classId) return
   const res = await axios.get(`${BASE_URL}/academic/classes/${classId}/sections`, apiConfig)
-  sections.value = res.data.data
+  sections.value = res.data.data || res.data
 }
+
 const loadStudents = async (sectionId) => {
   if (!sectionId) return
   const res = await axios.get(`${BASE_URL}/students/section/${sectionId}`, apiConfig)
-  students.value = res.data.data
+  students.value = res.data.data || res.data
 }
 
-// ✅ ফি তৈরি অথবা আপডেট করার ফাংশন
+// --- ২. ফি সেটআপ (CRUD) ---
 const saveFeeType = async () => {
   if (!newFeeType.value.name || !newFeeType.value.amount) {
     Swal.fire('Warning', 'Name and Amount are required', 'warning')
@@ -71,23 +73,20 @@ const saveFeeType = async () => {
 
   try {
     if (isEditing.value) {
-      // আপডেট রিকোয়েস্ট (PUT)
       await axios.put(`${BASE_URL}/accounts/fee-types/${editId.value}`, newFeeType.value, apiConfig)
       Swal.fire('Updated!', 'Fee type updated successfully.', 'success')
     } else {
-      // নতুন তৈরি রিকোয়েস্ট (POST)
       await axios.post(`${BASE_URL}/accounts/fee-types`, newFeeType.value, apiConfig)
       Swal.fire('Created!', 'Fee type created successfully.', 'success')
     }
 
-    cancelEdit() // ফর্ম রিসেট
-    loadInitialData() // লিস্ট রিফ্রেশ
+    cancelEdit()
+    loadInitialData()
   } catch (e) {
     Swal.fire('Error', 'Operation failed', 'error')
   }
 }
 
-// ✅ এডিট মোড চালু করা
 const editFeeType = (fee) => {
   newFeeType.value = {
     name: fee.name,
@@ -98,14 +97,12 @@ const editFeeType = (fee) => {
   isEditing.value = true
 }
 
-// ✅ এডিট বাতিল করা
 const cancelEdit = () => {
   newFeeType.value = { name: '', amount: '', due_date: '' }
   isEditing.value = false
   editId.value = null
 }
 
-// ✅ ফি ডিলিট করা
 const deleteFeeType = async (id) => {
   const confirm = await Swal.fire({
     title: 'Are you sure?',
@@ -113,7 +110,6 @@ const deleteFeeType = async (id) => {
     icon: 'warning',
     showCancelButton: true,
     confirmButtonColor: '#d33',
-    cancelButtonColor: '#3085d6',
     confirmButtonText: 'Yes, delete it!',
   })
 
@@ -128,15 +124,51 @@ const deleteFeeType = async (id) => {
   }
 }
 
-const generateInvoice = async () => {
-  try {
-    await axios.post(`${BASE_URL}/accounts/invoices`, invoiceForm.value, apiConfig)
-    Swal.fire('Success', 'Invoice generated!', 'success')
-  } catch (e) {
-    Swal.fire('Error', 'Failed', 'error')
+// --- ৩. জেনারেট ইনভয়েস (FIXED) ---
+
+// ✅ ফি টাইপ সিলেক্ট করলে অটোমেটিক টাকা বসবে
+const onInvoiceFeeTypeChange = () => {
+  const selected = feeTypes.value.find((ft) => ft.id == invoiceForm.value.fee_type_id)
+  if (selected) {
+    invoiceForm.value.amount = selected.amount
+  } else {
+    invoiceForm.value.amount = ''
   }
 }
 
+const generateInvoice = async () => {
+  // ভ্যালিডেশন
+  if (!invoiceForm.value.student_id || !invoiceForm.value.fee_type_id) {
+    Swal.fire('Warning', 'Please select Student and Fee Type', 'warning')
+    return
+  }
+  if (!invoiceForm.value.amount) {
+    Swal.fire('Warning', 'Amount is required!', 'warning')
+    return
+  }
+
+  try {
+    console.log('Sending Invoice Data:', invoiceForm.value)
+
+    await axios.post(`${BASE_URL}/accounts/invoices`, invoiceForm.value, apiConfig)
+
+    Swal.fire('Success', 'Invoice generated successfully!', 'success')
+
+    // ফর্ম রিসেট (ক্লাস/সেকশন বাদে)
+    invoiceForm.value.fee_type_id = ''
+    invoiceForm.value.amount = ''
+    invoiceForm.value.student_id = ''
+  } catch (e) {
+    console.error(e)
+    let msg = 'Failed to generate invoice'
+    if (e.response && e.response.data && e.response.data.message) {
+      msg = e.response.data.message
+    }
+    Swal.fire('Error', msg, 'error')
+  }
+}
+
+// --- ৪. ফি কালেকশন ---
 const getDues = async () => {
   if (!collectionFilter.value.student_id) return
   try {
@@ -144,9 +176,10 @@ const getDues = async () => {
       `${BASE_URL}/accounts/student/${collectionFilter.value.student_id}/invoices`,
       apiConfig,
     )
-    studentInvoices.value = res.data.data
+    studentInvoices.value = res.data.data || res.data
   } catch (e) {
     console.error(e)
+    Swal.fire('Error', 'Could not load dues', 'error')
   }
 }
 
@@ -160,8 +193,8 @@ const collectPayment = async () => {
   const { value: formValues } = await Swal.fire({
     title: 'Collect Payment',
     html:
-      `<input id="swal-amount" class="swal2-input" value="${paymentForm.value.amount}">` +
-      `<select id="swal-method" class="swal2-input"><option value="Cash">Cash</option><option value="Bkash">Bkash</option></select>`,
+      `<label>Amount</label><input id="swal-amount" class="swal2-input" value="${paymentForm.value.amount}">` +
+      `<label>Method</label><select id="swal-method" class="swal2-input"><option value="Cash">Cash</option><option value="Bkash">Bkash</option><option value="Bank">Bank</option></select>`,
     focusConfirm: false,
     preConfirm: () => {
       return {
@@ -182,20 +215,24 @@ const collectPayment = async () => {
         },
         apiConfig,
       )
-      Swal.fire('Paid!', 'Success', 'success')
-      getDues()
+      Swal.fire('Paid!', 'Payment collected successfully.', 'success')
+      getDues() // রিফ্রেশ
     } catch (e) {
-      Swal.fire('Error', e.response.data.message, 'error')
+      let msg = 'Payment failed'
+      if (e.response && e.response.data.message) msg = e.response.data.message
+      Swal.fire('Error', msg, 'error')
     }
   }
 }
 
+// --- ৫. হিস্ট্রি ---
 const loadHistory = async () => {
   try {
-    const res = await axios.get(`${BASE_URL}/accounts/history`, apiConfig)
-    allInvoices.value = res.data.data
+    // এখন GET মেথডে ইনভয়েস লিস্ট আসবে
+    const res = await axios.get(`${BASE_URL}/accounts/invoices`, apiConfig)
+    allInvoices.value = res.data.data || res.data
   } catch (e) {
-    console.error(e)
+    console.error('History Error:', e)
   }
 }
 
@@ -293,26 +330,56 @@ onMounted(loadInitialData)
     </div>
 
     <div v-if="activeTab === 'invoice'" class="card no-print">
-      <h3>Generate Invoice</h3>
+      <h3>Generate Invoice (Single Student)</h3>
       <div class="form-grid">
-        <select v-model="invoiceForm.class_id" @change="loadSections(invoiceForm.class_id)">
-          <option value="">Class</option>
-          <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
-        <select v-model="invoiceForm.section_id" @change="loadStudents(invoiceForm.section_id)">
-          <option value="">Section</option>
-          <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
-        </select>
-        <select v-model="invoiceForm.student_id">
-          <option value="">Student</option>
-          <option v-for="st in students" :key="st.id" :value="st.id">{{ st.name }}</option>
-        </select>
-        <select v-model="invoiceForm.fee_type_id">
-          <option value="">Fee Type</option>
-          <option v-for="ft in feeTypes" :key="ft.id" :value="ft.id">{{ ft.name }}</option>
-        </select>
-        <input v-model="invoiceForm.due_date" type="date" placeholder="Due Date" />
-        <button @click="generateInvoice" class="btn-save">Generate</button>
+        <div class="form-group">
+          <label>Class</label>
+          <select v-model="invoiceForm.class_id" @change="loadSections(invoiceForm.class_id)">
+            <option value="">-- Select Class --</option>
+            <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Section</label>
+          <select v-model="invoiceForm.section_id" @change="loadStudents(invoiceForm.section_id)">
+            <option value="">-- Select Section --</option>
+            <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Student</label>
+          <select v-model="invoiceForm.student_id">
+            <option value="">-- Select Student --</option>
+            <option v-for="st in students" :key="st.id" :value="st.id">
+              {{ st.name }} (Roll: {{ st.roll_no }})
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Fee Type</label>
+          <select v-model="invoiceForm.fee_type_id" @change="onInvoiceFeeTypeChange">
+            <option value="">-- Select Fee Type --</option>
+            <option v-for="ft in feeTypes" :key="ft.id" :value="ft.id">{{ ft.name }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Amount</label>
+          <input v-model="invoiceForm.amount" type="number" placeholder="Amount" />
+        </div>
+
+        <div class="form-group">
+          <label>Due Date</label>
+          <input v-model="invoiceForm.due_date" type="date" />
+        </div>
+      </div>
+      <div style="margin-top: 20px">
+        <button @click="generateInvoice" class="btn-save" style="width: 100%">
+          🚀 Generate Bill
+        </button>
       </div>
     </div>
 
@@ -339,6 +406,7 @@ onMounted(loadInitialData)
         </select>
         <button @click="getDues" class="btn-search">Search</button>
       </div>
+
       <table class="table mt-4" v-if="studentInvoices.length">
         <thead>
           <tr>
@@ -361,7 +429,7 @@ onMounted(loadInitialData)
             <td>{{ inv.status }}</td>
             <td>
               <button v-if="inv.status !== 'Paid'" @click="openPaymentModal(inv)" class="btn-pay">
-                Pay
+                💳 Pay
               </button>
             </td>
           </tr>
@@ -375,9 +443,9 @@ onMounted(loadInitialData)
         <table class="table table-bordered">
           <thead>
             <tr>
+              <th>ID</th>
               <th>Date</th>
-              <th>Name</th>
-              <th>Roll</th>
+              <th>Student</th>
               <th>Fee Type</th>
               <th>Amount</th>
               <th>Status</th>
@@ -386,9 +454,9 @@ onMounted(loadInitialData)
           </thead>
           <tbody>
             <tr v-for="inv in allInvoices" :key="inv.id">
+              <td>#{{ inv.id }}</td>
               <td>{{ new Date(inv.created_at).toLocaleDateString() }}</td>
               <td>{{ inv.student?.user?.name || 'Unknown' }}</td>
-              <td>{{ inv.student?.roll_no }}</td>
               <td>{{ inv.fee_type?.name }}</td>
               <td>{{ inv.total_amount }}</td>
               <td>
@@ -429,10 +497,7 @@ onMounted(loadInitialData)
         <hr />
         <p><strong>Student Name:</strong> {{ selectedReceipt.student?.user?.name }}</p>
         <p><strong>Student ID / Roll:</strong> {{ selectedReceipt.student?.roll_no }}</p>
-        <p>
-          <strong>Class:</strong> {{ selectedReceipt.student?.class_id }} (Section:
-          {{ selectedReceipt.student?.section_id }})
-        </p>
+        <p><strong>Class:</strong> {{ selectedReceipt.student?.school_class?.name || 'N/A' }}</p>
         <hr />
         <table class="receipt-table">
           <thead>

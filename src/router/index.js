@@ -25,7 +25,12 @@ import MarksEntry from '@/views/MarksEntry.vue'
 import ReportCard from '../views/ReportCard.vue'
 import TabulationSheet from '../views/TabulationSheet.vue'
 import Fees from '../views/Fees.vue'
-
+import PayrollView from '../views/hr/PayrollView.vue'
+import LibraryBookList from '../views/library/LibraryBookList.vue'
+import IssuedBooks from '../views/library/IssuedBooks.vue'
+import ExpenseManager from '../views/accounts/ExpenseManager.vue'
+import NoticeManager from '../views/notices/NoticeManager.vue'
+import LeaveRequests from '../views/hr/LeaveRequests.vue'
 // ✅ Student Portal Imports
 import StudentLayout from '../layouts/StudentLayout.vue'
 import StudentDashboard from '../views/student/StudentDashboard.vue'
@@ -177,6 +182,32 @@ const router = createRouter({
           component: Fees,
           meta: { requiresAuth: true },
         },
+        {
+          path: '/hr/payroll',
+          name: 'PayrollView',
+          component: PayrollView,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/library/books',
+          name: 'LibraryBookList',
+          component: LibraryBookList,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/library/issued',
+          name: 'IssuedBooks',
+          component: IssuedBooks,
+          meta: { requiresAuth: true },
+        },
+        {
+          path: '/accounts/expenses',
+          name: 'ExpenseManager',
+          component: ExpenseManager,
+          meta: { requiresAuth: true },
+        },
+        { path: '/notices', name: 'Notices', component: NoticeManager },
+        { path: '/hr/leaves', name: 'LeaveRequests', component: LeaveRequests },
       ],
     },
 
@@ -195,6 +226,12 @@ const router = createRouter({
         { path: 'routine', component: StudentRoutine },
         { path: 'results', component: StudentResults },
         { path: 'fees', component: StudentFees },
+        {
+          path: 'admit-card', // ফুল পাথ হবে: /student/admit-card
+          name: 'StudentAdmitCard',
+          component: () => import('../views/student/StudentAdmitCard.vue'),
+          meta: { title: 'Exam Admit Card' },
+        },
       ],
     },
   ],

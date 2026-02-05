@@ -70,6 +70,25 @@ const handleLogout = () => {
           <router-link to="/fees" class="nav-item" :class="{ active: $route.path === '/fees' }">
             <span class="icon">💰</span> <span>Fees & Accounts</span>
           </router-link>
+          <RouterLink to="/hr/payroll" class="nav-item" active-class="active">
+            <span class="icon">💸</span> Payroll
+          </RouterLink>
+          <RouterLink to="/library/books" class="nav-item" active-class="active">
+            <span class="icon">📚</span> Library
+          </RouterLink>
+          <RouterLink to="/library/issued" class="nav-item" active-class="active">
+            <span class="icon">📖</span> Issued List
+          </RouterLink>
+          <RouterLink to="/accounts/expenses" class="nav-item" active-class="active">
+            <span class="icon">📉</span> Expense Manager
+          </RouterLink>
+          <RouterLink to="/notices" class="nav-item" active-class="active">
+            <span class="icon">📢</span> Notice Board
+          </RouterLink>
+
+          <RouterLink to="/hr/leaves" class="nav-item" active-class="active">
+            <span class="icon">📅</span> Leave Requests
+          </RouterLink>
 
           <RouterLink to="/admin/settings" class="nav-item" active-class="active">
             <span class="icon">⚙️</span> General Settings

@@ -34,6 +34,10 @@ const handleLogout = async () => {
         <router-link to="/student/fees" class="nav-item">
           <span class="icon">💰</span> My Fees
         </router-link>
+        <router-link to="/student/admit-card" class="nav-item">
+          <span class="icon">🆔</span>
+          <span class="label">Admit Card</span>
+        </router-link>
         <router-link to="/student/change-password" class="nav-item">
           <span class="icon">🔒</span> Change Password
         </router-link>

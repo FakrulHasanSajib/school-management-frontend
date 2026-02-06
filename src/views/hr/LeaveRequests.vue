@@ -4,41 +4,50 @@ import axios from 'axios'
 import Swal from 'sweetalert2'
 
 const leaves = ref([])
-const loading = ref(false)
+const isLoading = ref(false)
 
-// ১. ছুটির রিকোয়েস্টগুলো লোড করা
+const BASE_URL = 'http://127.0.0.1:8000/api'
+const token = localStorage.getItem('token')
+const config = { headers: { Authorization: `Bearer ${token}` } }
+
+// ১. সব ছুটির আবেদন লোড করা
 const fetchLeaves = async () => {
-  loading.value = true
+  isLoading.value = true
   try {
-    const token = localStorage.getItem('token')
-    const res = await axios.get('http://127.0.0.1:8000/api/hr/leaves', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    // ব্যাকএন্ড থেকে আসা ডাটা সেট করা
-    leaves.value = res.data.data || []
+    // 🔴 আগে এখানে ভুল ছিল: /hr/leaves
+    // ✅ সঠিক রাউট: /hr/leave
+    const res = await axios.get(`${BASE_URL}/hr/leave`, config)
+    leaves.value = res.data.data || res.data
   } catch (error) {
     console.error('Fetch error:', error)
+    Swal.fire('Error', 'Failed to load leave requests', 'error')
   } finally {
-    loading.value = false
+    isLoading.value = false
   }
 }
 
-// ২. ছুটির স্ট্যাটাস আপডেট করা (Approve/Reject)
+// ২. স্ট্যাটাস আপডেট করা (Approve/Reject)
 const updateStatus = async (id, status) => {
-  try {
-    const token = localStorage.getItem('token')
-    // API Route: /hr/leave/{id}/status
-    await axios.patch(
-      `http://127.0.0.1:8000/api/hr/leave/${id}/status`,
-      { status },
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    )
-    Swal.fire('Success', `Leave request has been ${status}`, 'success')
-    fetchLeaves() // লিস্ট রিফ্রেশ করা
-  } catch (error) {
-    Swal.fire('Error', 'Failed to update leave status', 'error')
+  const actionText = status === 'Approved' ? 'Approve' : 'Reject'
+
+  const confirm = await Swal.fire({
+    title: `${actionText} Request?`,
+    text: `Are you sure you want to ${actionText.toLowerCase()} this application?`,
+    icon: status === 'Approved' ? 'question' : 'warning',
+    showCancelButton: true,
+    confirmButtonColor: status === 'Approved' ? '#10b981' : '#ef4444',
+    confirmButtonText: `Yes, ${actionText} it!`,
+  })
+
+  if (confirm.isConfirmed) {
+    try {
+      await axios.patch(`${BASE_URL}/hr/leave/${id}/status`, { status }, config)
+
+      Swal.fire('Updated!', `Leave request has been ${status.toLowerCase()}.`, 'success')
+      fetchLeaves() // লিস্ট রিফ্রেশ
+    } catch (error) {
+      Swal.fire('Error', 'Failed to update status', 'error')
+    }
   }
 }
 
@@ -49,54 +58,63 @@ onMounted(() => {
 
 <template>
   <div class="page-container">
-    <h2 class="page-title">📅 Leave Requests Management</h2>
+    <h2 class="page-title">📝 Leave Applications</h2>
 
     <div class="table-card">
-      <table class="custom-table">
+      <div v-if="isLoading" class="loading">Loading requests...</div>
+
+      <table v-else class="custom-table">
         <thead>
           <tr>
-            <th>Applicant Name</th>
-            <th>Leave Type</th>
-            <th>Start Date</th>
-            <th>End Date</th>
+            <th>Applicant</th>
+            <th>Type</th>
+            <th>Duration</th>
+            <th>Reason</th>
             <th>Status</th>
             <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="text-center">Loading data...</td>
-          </tr>
-
-          <tr v-for="l in leaves" :key="l.id">
+          <tr v-for="leave in leaves" :key="leave.id">
             <td>
-              <div class="user-info">
-                <strong>{{ l.user?.name || 'Unknown User' }}</strong>
-                <small>{{ l.user?.email || '' }}</small>
-              </div>
+              <strong>{{ leave.user?.name || 'Unknown' }}</strong>
+              <small style="display: block; color: #aaa">ID: {{ leave.user_id }}</small>
             </td>
             <td>
-              <span class="type-badge">{{ l.type }}</span>
-            </td>
-            <td>{{ l.start_date }}</td>
-            <td>{{ l.end_date }}</td>
-            <td>
-              <span :class="['badge', l.status.toLowerCase()]">{{ l.status }}</span>
+              <span class="badge">{{ leave.type }}</span>
             </td>
             <td>
-              <div v-if="l.status === 'Pending'" class="action-buttons">
-                <button @click="updateStatus(l.id, 'Approved')" class="btn-approve" title="Approve">
-                  ✔
+              {{ new Date(leave.start_date).toLocaleDateString() }}
+              <br />to<br />
+              {{ new Date(leave.end_date).toLocaleDateString() }}
+            </td>
+            <td class="reason-cell" :title="leave.reason">{{ leave.reason }}</td>
+            <td>
+              <span :class="['status-badge', leave.status.toLowerCase()]">
+                {{ leave.status }}
+              </span>
+            </td>
+            <td>
+              <div v-if="leave.status === 'Pending'" class="action-buttons">
+                <button
+                  @click="updateStatus(leave.id, 'Approved')"
+                  class="btn-approve"
+                  title="Approve"
+                >
+                  ✅
                 </button>
-                <button @click="updateStatus(l.id, 'Rejected')" class="btn-reject" title="Reject">
-                  ✖
+                <button
+                  @click="updateStatus(leave.id, 'Rejected')"
+                  class="btn-reject"
+                  title="Reject"
+                >
+                  ❌
                 </button>
               </div>
-              <span v-else class="status-done">Processed</span>
+              <span v-else class="text-muted">Completed</span>
             </td>
           </tr>
-
-          <tr v-if="!loading && leaves.length === 0">
+          <tr v-if="leaves.length === 0">
             <td colspan="6" class="text-center">No leave requests found.</td>
           </tr>
         </tbody>
@@ -108,119 +126,114 @@ onMounted(() => {
 <style scoped>
 .page-container {
   padding: 20px;
-  color: #fff;
-  max-width: 1100px;
+  color: white;
+  max-width: 1000px;
   margin: 0 auto;
 }
 .page-title {
-  margin-bottom: 25px;
+  margin-bottom: 20px;
   font-size: 24px;
-  border-bottom: 1px solid #333;
-  padding-bottom: 15px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
 }
 
-/* Table Card Styles */
+/* Table Styles */
 .table-card {
   background: #1e1e2d;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #2b2b40;
+  border: 1px solid #333;
 }
 .custom-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
 }
-.custom-table th {
-  background: #2b2b40;
-  padding: 15px;
-  color: #a1a5b7;
-  font-weight: 600;
-  font-size: 13px;
-  text-transform: uppercase;
-}
+.custom-table th,
 .custom-table td {
   padding: 15px;
-  border-bottom: 1px solid #2b2b40;
-  vertical-align: middle;
+  border-bottom: 1px solid #333;
+}
+.custom-table th {
+  background: #2b2b40;
+  color: #a1a5b7;
 }
 
-/* User Info */
-.user-info {
-  display: flex;
-  flex-direction: column;
+.reason-cell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #ccc;
 }
-.user-info small {
-  color: #6c7293;
-  font-size: 11px;
+.loading,
+.text-center {
+  text-align: center;
+  padding: 30px;
+  color: #aaa;
 }
 
 /* Badges */
-.type-badge {
-  background: #2f2f45;
-  padding: 4px 8px;
+.badge {
+  background: #4b5563;
+  padding: 3px 8px;
   border-radius: 4px;
   font-size: 12px;
 }
-.badge {
-  padding: 5px 10px;
-  border-radius: 6px;
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 15px;
   font-size: 11px;
   font-weight: bold;
   text-transform: uppercase;
 }
-.badge.pending {
-  background: rgba(255, 184, 34, 0.1);
-  color: #ffb822;
+.status-badge.pending {
+  background: #f59e0b;
+  color: #000;
 }
-.badge.approved {
-  background: rgba(28, 209, 107, 0.1);
-  color: #1cd16b;
+.status-badge.approved {
+  background: #10b981;
+  color: white;
 }
-.badge.rejected {
-  background: rgba(246, 78, 96, 0.1);
-  color: #f64e60;
+.status-badge.rejected {
+  background: #ef4444;
+  color: white;
 }
 
 /* Buttons */
 .action-buttons {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 .btn-approve,
 .btn-reject {
   border: none;
-  width: 32px;
-  height: 32px;
+  padding: 5px 10px;
   border-radius: 6px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: 0.3s;
+  font-size: 16px;
+  transition: 0.2s;
 }
 .btn-approve {
-  background: #1cd16b;
-  color: white;
+  background: #064e3b;
+  color: #34d399;
+}
+.btn-approve:hover {
+  background: #065f46;
+  transform: scale(1.1);
 }
 .btn-reject {
-  background: #f64e60;
-  color: white;
+  background: #7f1d1d;
+  color: #f87171;
 }
-.btn-approve:hover,
 .btn-reject:hover {
-  opacity: 0.8;
-  transform: translateY(-2px);
+  background: #991b1b;
+  transform: scale(1.1);
 }
 
-.status-done {
-  color: #6c7293;
-  font-size: 12px;
+.text-muted {
+  color: #6b7280;
+  font-size: 13px;
   font-style: italic;
-}
-.text-center {
-  text-align: center;
-  color: #6c7293;
-  padding: 30px !important;
 }
 </style>

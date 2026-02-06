@@ -38,6 +38,11 @@ import StudentChangePassword from '../views/student/StudentChangePassword.vue'
 import StudentRoutine from '../views/student/StudentRoutine.vue'
 import StudentResults from '../views/student/StudentResults.vue'
 import StudentFees from '../views/student/StudentFees.vue'
+import { h } from 'vue'
+import StudentAdmitCard from '../views/student/StudentAdmitCard.vue'
+import StudentNotices from '../views/student/StudentNotices.vue'
+import StudentLibrary from '../views/student/StudentLibrary.vue'
+import StudentLeave from '../views/student/StudentLeave.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -231,6 +236,21 @@ const router = createRouter({
           name: 'StudentAdmitCard',
           component: () => import('../views/student/StudentAdmitCard.vue'),
           meta: { title: 'Exam Admit Card' },
+        },
+        {
+          path: 'notices',
+          name: 'StudentNotices',
+          component: () => import('../views/student/StudentNotices.vue'),
+        },
+        {
+          path: 'library',
+          name: 'StudentLibrary',
+          component: () => import('../views/student/StudentLibrary.vue'),
+        },
+        {
+          path: 'leave',
+          name: 'StudentLeave',
+          component: () => import('../views/student/StudentLeave.vue'),
         },
       ],
     },

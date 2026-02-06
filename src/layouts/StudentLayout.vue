@@ -41,6 +41,32 @@ const handleLogout = async () => {
         <router-link to="/student/change-password" class="nav-item">
           <span class="icon">🔒</span> Change Password
         </router-link>
+        <router-link
+          to="/student/notices"
+          class="nav-item"
+          :class="{ active: route.path.includes('notices') }"
+        >
+          <span class="icon">📢</span>
+          <span v-if="isSidebarOpen" class="text">Notice Board</span>
+        </router-link>
+
+        <router-link
+          to="/student/library"
+          class="nav-item"
+          :class="{ active: route.path.includes('library') }"
+        >
+          <span class="icon">📚</span>
+          <span v-if="isSidebarOpen" class="text">Library</span>
+        </router-link>
+
+        <router-link
+          to="/student/leave"
+          class="nav-item"
+          :class="{ active: route.path.includes('leave') }"
+        >
+          <span class="icon">📝</span>
+          <span v-if="isSidebarOpen" class="text">Leave Request</span>
+        </router-link>
 
         <button @click="handleLogout" class="nav-item logout">
           <span class="icon">↪️</span> Log out

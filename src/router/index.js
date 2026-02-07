@@ -31,6 +31,7 @@ import IssuedBooks from '../views/library/IssuedBooks.vue'
 import ExpenseManager from '../views/accounts/ExpenseManager.vue'
 import NoticeManager from '../views/notices/NoticeManager.vue'
 import LeaveRequests from '../views/hr/LeaveRequests.vue'
+import AssignTeacher from '../views/AssignTeacher.vue'
 // ✅ Student Portal Imports
 import StudentLayout from '../layouts/StudentLayout.vue'
 import StudentDashboard from '../views/student/StudentDashboard.vue'
@@ -43,6 +44,13 @@ import StudentAdmitCard from '../views/student/StudentAdmitCard.vue'
 import StudentNotices from '../views/student/StudentNotices.vue'
 import StudentLibrary from '../views/student/StudentLibrary.vue'
 import StudentLeave from '../views/student/StudentLeave.vue'
+//Teacher portal
+import TeacherLayout from '@/layouts/TeacherLayout.vue'
+import TeacherDashboard from '@/views/teacher/Dashboard.vue'
+import TeacherMarksEntry from '@/views/teacher/MarksEntry.vue'
+import TeacherRoutine from '@/views/teacher/TeacherRoutine.vue'
+// এই পাথটি সঠিক হতে হবে
+import TeacherAttendance from '@/views/teacher/Attendance.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -213,6 +221,7 @@ const router = createRouter({
         },
         { path: '/notices', name: 'Notices', component: NoticeManager },
         { path: '/hr/leaves', name: 'LeaveRequests', component: LeaveRequests },
+        { path: 'assign-teacher', name: 'AssignTeacher', component: AssignTeacher },
       ],
     },
 
@@ -252,6 +261,24 @@ const router = createRouter({
           name: 'StudentLeave',
           component: () => import('../views/student/StudentLeave.vue'),
         },
+      ],
+    },
+
+    // ✅ TEACHER ROUTES (NEW)
+    {
+      path: '/teacher',
+      component: TeacherLayout,
+      meta: { requiresAuth: true, role: 'teacher' },
+      children: [
+        {
+          path: 'dashboard',
+          name: 'TeacherDashboard',
+          component: TeacherDashboard,
+        },
+        { path: 'marks', name: 'TeacherMarksEntry', component: TeacherMarksEntry },
+
+        { path: 'routine', name: 'TeacherRoutine', component: TeacherRoutine },
+        { path: 'attendance', name: 'TeacherAttendance', component: TeacherAttendance },
       ],
     },
   ],

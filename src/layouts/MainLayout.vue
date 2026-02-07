@@ -89,6 +89,9 @@ const handleLogout = () => {
           <RouterLink to="/hr/leaves" class="nav-item" active-class="active">
             <span class="icon">📅</span> Leave Requests
           </RouterLink>
+          <RouterLink to="/admin/assign-teacher" class="nav-item" active-class="active">
+            <span class="icon">➕</span> Assign Teacher
+          </RouterLink>
 
           <RouterLink to="/admin/settings" class="nav-item" active-class="active">
             <span class="icon">⚙️</span> General Settings

@@ -2,33 +2,128 @@
 import { ref } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
+import Swal from 'sweetalert2' // ✅ SweetAlert ইমপোর্ট
 
 const router = useRouter()
 const isLoading = ref(false)
 const errors = ref({})
+const imagePreview = ref(null)
 
 const form = ref({
   name: '',
   email: '',
-  password: 'password123',
+  password: '12345678',
   designation: '',
   qualification: '',
   phone: '',
   joining_date: '',
+  blood_group: '',
+  image: null,
+  address: '',
 })
 
+// ১. ছবি সিলেক্ট ও প্রিভিউ লজিক
+const handleFileChange = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    form.value.image = file
+    imagePreview.value = URL.createObjectURL(file)
+  }
+}
+
+// ২. ফর্ম সাবমিট লজিক
 const handleSubmit = async () => {
   isLoading.value = true
   errors.value = {}
+
+  // টোকেন চেক
+  const token = localStorage.getItem('token')
+  if (!token) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'সেশন শেষ',
+      text: 'আপনার সেশন শেষ হয়ে গেছে। দয়া করে আবার লগইন করুন।',
+      confirmButtonColor: '#f59e0b',
+    })
+    router.push('/login')
+    return
+  }
+
+  // ৩. FormData তৈরি
+  const formData = new FormData()
+  formData.append('name', form.value.name)
+  formData.append('email', form.value.email)
+  formData.append('password', form.value.password)
+  formData.append('designation', form.value.designation)
+  formData.append('qualification', form.value.qualification)
+  formData.append('phone', form.value.phone)
+  formData.append('joining_date', form.value.joining_date)
+  formData.append('blood_group', form.value.blood_group || '')
+  formData.append('role', 'teacher')
+
+  if (form.value.image) {
+    formData.append('image', form.value.image)
+  }
+
   try {
-    await axios.post('http://127.0.0.1:8000/api/teachers', form.value)
-    alert('শিক্ষক সফলভাবে যোগ করা হয়েছে! 🎉')
-    router.push('/admin/teachers')
+    // ৪. API কল
+    await axios.post('http://127.0.0.1:8000/api/teachers', formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+
+    // ✅ ৫. SweetAlert Success Message
+    Swal.fire({
+      icon: 'success',
+      title: 'সফল!',
+      text: 'শিক্ষক সফলভাবে যোগ করা হয়েছে! 🎉',
+      confirmButtonText: 'ঠিক আছে',
+      confirmButtonColor: '#10b981',
+      timer: 2000, // ২ সেকেন্ড পর অটো বন্ধ হবে
+    }).then(() => {
+      router.push('/admin/teachers')
+    })
   } catch (error) {
-    if (error.response && error.response.status === 422) {
-      errors.value = error.response.data.errors
+    console.error('Error:', error.response)
+
+    if (error.response) {
+      if (error.response.status === 422) {
+        // ✅ ভ্যালিডেশন এরর এলার্ট
+        errors.value = error.response.data.errors
+        Swal.fire({
+          icon: 'error',
+          title: 'যাচাইকরণ ব্যর্থ!',
+          text: 'দয়া করে ফর্মের লাল দাগ দেওয়া ফিল্ডগুলো চেক করুন।',
+          confirmButtonColor: '#ef4444',
+        })
+      } else if (error.response.status === 401) {
+        // ✅ অথেন্টিকেশন এরর এলার্ট
+        Swal.fire({
+          icon: 'error',
+          title: 'অননুমোদিত',
+          text: 'আপনার লগইন সেশন শেষ। আবার লগইন করুন।',
+          confirmButtonColor: '#ef4444',
+        })
+        router.push('/login')
+      } else {
+        // ✅ সার্ভার এরর এলার্ট
+        Swal.fire({
+          icon: 'error',
+          title: 'সার্ভার এরর!',
+          text: 'দুঃখিত, সার্ভারে কোনো সমস্যা হয়েছে।',
+          confirmButtonColor: '#ef4444',
+        })
+      }
     } else {
-      alert('সার্ভার এরর! দয়া করে পরে আবার চেষ্টা করুন।')
+      // ✅ নেটওয়ার্ক এরর এলার্ট
+      Swal.fire({
+        icon: 'error',
+        title: 'নেটওয়ার্ক সমস্যা!',
+        text: 'সার্ভারের সাথে সংযোগ স্থাপন করা যাচ্ছে না।',
+        confirmButtonColor: '#ef4444',
+      })
     }
   } finally {
     isLoading.value = false
@@ -75,7 +170,7 @@ const handleSubmit = async () => {
           </div>
 
           <div class="form-group">
-            <label>পদবী (Designation)</label>
+            <label>পদবী (Designation) <span class="required">*</span></label>
             <div class="input-box">
               <span class="icon">🎓</span>
               <input
@@ -113,33 +208,28 @@ const handleSubmit = async () => {
                 :class="{ 'has-error': errors.phone }"
               />
             </div>
-            <span v-if="errors.phone" class="error-msg">{{ errors.phone[0] }}</span>
-          </div>
-          <div class="form-group">
-            <label>রক্তের গ্রুপ</label>
-            <select v-model="form.blood_group" class="input-select">
-              <option value="">নির্বাচন করুন</option>
-              <option value="A+">A+</option>
-              <option value="A-">A-</option>
-              <option value="B+">B+</option>
-              <option value="B-">B-</option>
-              <option value="O+">O+</option>
-              <option value="O-">O-</option>
-              <option value="AB+">AB+</option>
-              <option value="AB-">AB-</option>
-            </select>
           </div>
 
           <div class="form-group">
-            <label>শিক্ষকের ছবি</label>
-            <input type="file" @change="handleFileChange" accept="image/*" />
-            <div v-if="imagePreview" class="preview-box">
-              <img :src="imagePreview" class="preview-img" />
+            <label>রক্তের গ্রুপ</label>
+            <div class="input-box">
+              <span class="icon">🩸</span>
+              <select v-model="form.blood_group" class="input-select">
+                <option value="">নির্বাচন করুন</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+              </select>
             </div>
           </div>
 
           <div class="form-group">
-            <label>যোগদানের তারিখ</label>
+            <label>যোগদানের তারিখ <span class="required">*</span></label>
             <div class="input-box">
               <span class="icon">📅</span>
               <input
@@ -149,6 +239,16 @@ const handleSubmit = async () => {
               />
             </div>
             <span v-if="errors.joining_date" class="error-msg">{{ errors.joining_date[0] }}</span>
+          </div>
+
+          <div class="form-group">
+            <label>শিক্ষকের ছবি</label>
+            <div class="file-upload-box">
+              <input type="file" @change="handleFileChange" accept="image/*" class="file-input" />
+              <div v-if="imagePreview" class="preview-box">
+                <img :src="imagePreview" class="preview-img" alt="Preview" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -174,7 +274,7 @@ const handleSubmit = async () => {
 
 /* Glass/Dark Card Style */
 .glass-card {
-  background: #2e2e2e; /* Dark Card Background */
+  background: #2e2e2e;
   border-radius: 20px;
   padding: 40px;
   width: 100%;
@@ -205,7 +305,7 @@ const handleSubmit = async () => {
 /* Form Grid Layout */
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr; /* 2 Column Layout */
+  grid-template-columns: 1fr 1fr;
   gap: 25px;
 }
 
@@ -239,24 +339,27 @@ label {
   z-index: 10;
 }
 
-input {
+input,
+select.input-select {
   width: 100%;
-  background: #1f1f1f; /* Darker Input Background */
+  background: #1f1f1f;
   border: 1px solid #444;
-  padding: 12px 15px 12px 45px; /* Padding left for icon */
-  border-radius: 50px; /* Pill Shape */
+  padding: 12px 15px 12px 45px;
+  border-radius: 50px;
   color: white;
   font-size: 0.95rem;
   outline: none;
   transition: all 0.3s ease;
+  appearance: none;
 }
 
 input::placeholder {
   color: #666;
 }
 
-input:focus {
-  border-color: #9b51e0; /* Purple Focus */
+input:focus,
+select:focus {
+  border-color: #9b51e0;
   box-shadow: 0 0 0 3px rgba(155, 81, 224, 0.2);
   background: #252525;
 }
@@ -264,16 +367,41 @@ input:focus {
 .has-error {
   border-color: #ef4444;
 }
-
 .error-msg {
   color: #ef4444;
   font-size: 0.8rem;
   margin-left: 10px;
 }
 
+/* File Input & Preview */
+.file-upload-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.file-input {
+  padding: 10px;
+  background: #1f1f1f;
+  border-radius: 10px;
+  border: 1px dashed #555;
+  cursor: pointer;
+}
+.preview-box {
+  width: 100px;
+  height: 100px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid #9b51e0;
+}
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* Date Input Fix */
 input[type='date']::-webkit-calendar-picker-indicator {
-  filter: invert(1); /* Make calendar icon white */
+  filter: invert(1);
   cursor: pointer;
 }
 
@@ -285,6 +413,7 @@ input[type='date']::-webkit-calendar-picker-indicator {
   margin-top: 30px;
   padding-top: 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  grid-column: span 2;
 }
 
 .cancel-btn {
@@ -311,12 +440,12 @@ input[type='date']::-webkit-calendar-picker-indicator {
   border-radius: 50px;
   cursor: pointer;
   font-weight: 600;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
   display: flex;
   align-items: center;
   gap: 10px;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .submit-btn:hover {
@@ -349,12 +478,10 @@ input[type='date']::-webkit-calendar-picker-indicator {
 /* Responsive */
 @media (max-width: 768px) {
   .form-grid {
-    grid-template-columns: 1fr; /* Single column on mobile */
-  }
-  .glass-card {
-    padding: 20px;
+    grid-template-columns: 1fr;
   }
   .form-actions {
+    grid-column: span 1;
     flex-direction: column-reverse;
   }
   .submit-btn,

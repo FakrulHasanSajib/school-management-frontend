@@ -3,9 +3,10 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 
-const activeTab = ref('books') // books | requests
+const activeTab = ref('books') // books | requests | issued
 const books = ref([])
 const requests = ref([])
+const issuedBooks = ref([])
 const students = ref([])
 const showAddModal = ref(false)
 const showIssueModal = ref(false)
@@ -46,6 +47,15 @@ const fetchRequests = async () => {
   }
 }
 
+const fetchIssuedBooks = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}/library/issued-books`, config)
+    issuedBooks.value = res.data.data || res.data
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 // ২. বই অ্যাড করা
 const submitBook = async () => {
   try {
@@ -63,56 +73,41 @@ const submitBook = async () => {
 const openManualIssueModal = (book) => {
   issueForm.value.book_id = book.id
   issueForm.value.book_title = book.title
-  issueForm.value.student_id = '' // রিসেট
-  issueForm.value.return_date = '' // রিসেট
+  issueForm.value.student_id = ''
+  issueForm.value.return_date = ''
   showIssueModal.value = true
 }
 
-// ✅ ৪. রিকোয়েস্ট থেকে ইস্যু মোডাল ওপেন করা (With Auto-Select & Alert)
-// ৪. রিকোয়েস্ট থেকে ইস্যু মোডাল ওপেন করা (Smart Match Fixed)
+// ৪. রিকোয়েস্ট থেকে ইস্যু মোডাল ওপেন করা (Smart Match)
 const approveRequest = (req) => {
-  console.log('🔍 Processing Request for User ID:', req.user_id, 'Name:', req.user?.name)
-
-  // ১. বইয়ের তথ্য সেট করা
   issueForm.value.book_id = req.book_id
   issueForm.value.book_title = req.book?.title
 
-  // ২. স্টুডেন্ট খোঁজার স্মার্ট লজিক
-  // প্রথমে: User ID দিয়ে খোঁজা
+  // স্মার্ট স্টুডেন্ট সিলেক্ট লজিক (ID or Name Match)
   let targetStudent = students.value.find((s) => s.user_id == req.user_id)
 
-  // দ্বিতীয়: যদি আইডি দিয়ে না পায়, তবে নাম (Name) দিয়ে খোঁজা (Fallback)
   if (!targetStudent && req.user?.name) {
-    console.warn('⚠️ ID mismatch! Trying to find by Name...')
-
     const requestName = req.user.name.toLowerCase().trim()
-
-    targetStudent = students.value.find((s) => {
-      // স্টুডেন্টের নাম স্টুডেন্ট টেবিলে অথবা ইউজার টেবিলে থাকতে পারে
-      const sName = (s.user?.name || s.name || '').toLowerCase().trim()
-      return sName === requestName
-    })
+    targetStudent = students.value.find(
+      (s) => (s.user?.name || s.name || '').toLowerCase().trim() === requestName,
+    )
   }
 
-  // ৩. রেজাল্ট চেক করা
   if (targetStudent) {
-    console.log('✅ Student Found (Auto-Selected):', targetStudent.user?.name || targetStudent.name)
-    issueForm.value.student_id = targetStudent.id // ড্রপডাউনে আইডি সেট হবে
+    issueForm.value.student_id = targetStudent.id
   } else {
-    console.error('❌ Student Not Found even by Name!')
-    issueForm.value.student_id = '' // খুঁজে না পেলে ফাঁকা
-
-    Swal.fire({
-      icon: 'warning',
-      title: 'Student Not Found!',
-      text: `System could not auto-select the student. Please select '${req.user?.name}' manually from the list.`,
-    })
+    Swal.fire(
+      'Warning',
+      'Student profile not found via ID or Name. Please select manually.',
+      'warning',
+    )
+    issueForm.value.student_id = ''
   }
 
   showIssueModal.value = true
 }
 
-// ৫. ইস্যু সাবমিট (Submit & Refresh Lists)
+// ৫. ইস্যু সাবমিট
 const submitIssue = async () => {
   if (!issueForm.value.student_id || !issueForm.value.return_date) {
     Swal.fire('Warning', 'Please select a student and return date', 'warning')
@@ -121,19 +116,42 @@ const submitIssue = async () => {
 
   try {
     await axios.post(`${BASE_URL}/library/issue`, issueForm.value, config)
-
     Swal.fire('Success', 'Book issued successfully!', 'success')
     showIssueModal.value = false
 
-    // ✅ লিস্ট রিফ্রেশ (যাতে রিকোয়েস্টটি চলে যায় এবং স্টক কমে)
+    // সব লিস্ট রিফ্রেশ
     fetchBooks()
     fetchRequests()
+    fetchIssuedBooks()
   } catch (e) {
     Swal.fire('Error', e.response?.data?.message || 'Failed to issue book.', 'error')
   }
 }
 
-// ৬. রিজেক্ট (Coming Soon)
+// ৬. বই ফেরত নেওয়া (Return Book)
+const returnBook = async (id) => {
+  const confirm = await Swal.fire({
+    title: 'Return Book?',
+    text: 'Mark this book as returned by student?',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#3085d6',
+    confirmButtonText: 'Yes, Return it!',
+  })
+
+  if (confirm.isConfirmed) {
+    try {
+      await axios.post(`${BASE_URL}/library/return/${id}`, {}, config)
+      Swal.fire('Returned!', 'Book marked as returned.', 'success')
+      fetchIssuedBooks() // আপডেট লিস্ট
+      fetchBooks() // স্টক আপডেট
+    } catch (e) {
+      Swal.fire('Error', 'Failed to return book', 'error')
+    }
+  }
+}
+
+// ৭. রিজেক্ট (Coming Soon)
 const rejectRequest = async (id) => {
   Swal.fire('Info', 'Reject feature coming soon', 'info')
 }
@@ -142,6 +160,7 @@ onMounted(() => {
   fetchBooks()
   fetchStudents()
   fetchRequests()
+  fetchIssuedBooks()
 })
 </script>
 
@@ -151,10 +170,13 @@ onMounted(() => {
       <h2 class="page-title">📚 Library Management</h2>
       <div class="tabs">
         <button :class="{ active: activeTab === 'books' }" @click="activeTab = 'books'">
-          📖 All Books
+          📖 Books
         </button>
         <button :class="{ active: activeTab === 'requests' }" @click="activeTab = 'requests'">
           🔔 Requests <span v-if="requests.length" class="badge-count">{{ requests.length }}</span>
+        </button>
+        <button :class="{ active: activeTab === 'issued' }" @click="activeTab = 'issued'">
+          🎓 Issued / Return
         </button>
       </div>
     </div>
@@ -167,7 +189,6 @@ onMounted(() => {
             <tr>
               <th>Title</th>
               <th>Author</th>
-              <th>Category</th>
               <th>Stock</th>
               <th>Action</th>
             </tr>
@@ -178,9 +199,6 @@ onMounted(() => {
                 <strong>{{ book.title }}</strong>
               </td>
               <td>{{ book.author }}</td>
-              <td>
-                <span class="badge">{{ book.category }}</span>
-              </td>
               <td>
                 <span :class="['stock-badge', book.quantity > 0 ? 'in-stock' : 'out-stock']">
                   {{ book.quantity }} Available
@@ -229,6 +247,62 @@ onMounted(() => {
             </tr>
             <tr v-if="requests.length === 0">
               <td colspan="5" class="text-center">No pending requests.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div v-if="activeTab === 'issued'">
+      <div class="table-card">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Student Name</th>
+              <th>Book Title</th>
+              <th>Issued On</th>
+              <th>Return Date</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="issue in issuedBooks" :key="issue.id">
+              <td>
+                <strong>{{ issue.student?.user?.name || issue.student?.name }}</strong>
+                <br /><small style="color: #aaa">Roll: {{ issue.student?.roll_no }}</small>
+              </td>
+              <td>{{ issue.book?.title }}</td>
+              <td>{{ new Date(issue.issue_date).toLocaleDateString() }}</td>
+              <td>{{ new Date(issue.return_date).toLocaleDateString() }}</td>
+              <td>
+                <span v-if="issue.status === 'Returned'" class="badge-status returned"
+                  >Returned</span
+                >
+                <span
+                  v-else
+                  :class="
+                    new Date(issue.return_date) < new Date()
+                      ? 'badge-status overdue'
+                      : 'badge-status issued'
+                  "
+                >
+                  {{ new Date(issue.return_date) < new Date() ? 'Overdue' : 'Issued' }}
+                </span>
+              </td>
+              <td>
+                <button
+                  v-if="issue.status !== 'Returned'"
+                  @click="returnBook(issue.id)"
+                  class="btn-return"
+                >
+                  ↩ Return
+                </button>
+                <span v-else class="text-muted">✔ Done</span>
+              </td>
+            </tr>
+            <tr v-if="issuedBooks.length === 0">
+              <td colspan="6" class="text-center">No books currently issued.</td>
             </tr>
           </tbody>
         </table>
@@ -348,6 +422,7 @@ onMounted(() => {
   color: #aaa;
 }
 
+/* Buttons & Badges */
 .btn-approve {
   background: #10b981;
   color: white;
@@ -365,8 +440,76 @@ onMounted(() => {
   border-radius: 5px;
   cursor: pointer;
 }
+.btn-return {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+.btn-return:hover {
+  background: #d97706;
+}
+.add-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 15px;
+}
+.action-btn.issue {
+  background: #8b5cf6;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  border: none;
+  font-weight: bold;
+}
 
-/* Modal & General Styles */
+.badge-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+.badge-status.pending {
+  background: #f59e0b;
+  color: #000;
+}
+.badge-status.returned {
+  background: #064e3b;
+  color: #34d399;
+}
+.badge-status.issued {
+  background: #3b82f6;
+  color: white;
+}
+.badge-status.overdue {
+  background: #7f1d1d;
+  color: #f87171;
+}
+.stock-badge {
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: bold;
+}
+.in-stock {
+  background: #064e3b;
+  color: #34d399;
+}
+.out-stock {
+  background: #7f1d1d;
+  color: #f87171;
+}
+
+/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -406,56 +549,13 @@ onMounted(() => {
   border-radius: 8px;
   cursor: pointer;
 }
-.add-btn {
-  background: #2563eb;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-bottom: 15px;
-}
-.action-btn.issue {
-  background: #8b5cf6;
-  color: white;
-  padding: 6px 12px;
-  border-radius: 5px;
-  cursor: pointer;
-  border: none;
-  font-weight: bold;
-}
-.badge {
-  background: #444;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-.stock-badge {
-  padding: 3px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: bold;
-}
-.in-stock {
-  background: #064e3b;
-  color: #34d399;
-}
-.out-stock {
-  background: #7f1d1d;
-  color: #f87171;
-}
-.badge-status.pending {
-  background: #f59e0b;
-  color: #000;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: bold;
-  text-transform: uppercase;
-}
 .text-center {
   text-align: center;
   color: #aaa;
   padding: 20px;
+}
+.text-muted {
+  color: #666;
+  font-style: italic;
 }
 </style>

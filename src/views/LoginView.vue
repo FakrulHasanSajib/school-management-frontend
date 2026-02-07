@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import Swal from 'sweetalert2' // সুন্দর এলার্টের জন্য (অপশনাল)
 
 const email = ref('')
 const password = ref('')
@@ -13,24 +14,33 @@ const authStore = useAuthStore()
 const handleLogin = async () => {
   isLoading.value = true
   errorMessage.value = ''
+
   try {
     // ১. লগইন অ্যাকশন কল করা
     await authStore.login(email.value, password.value)
 
-    // ২. রোল চেক করা (স্টোর বা লোকাল স্টোরেজ থেকে)
+    // ২. রোল চেক করা
     const role = localStorage.getItem('user_role') || authStore.user?.role
 
-    // ৩. রোল অনুযায়ী সঠিক ড্যাশবোর্ডে রিডাইরেক্ট
+    console.log('User Role Found:', role) // কনসোলে চেক করার জন্য
+
+    // ৩. ✅ রোল অনুযায়ী সঠিক রিডাইরেক্ট (লজিক ফিক্সড)
     if (role === 'student') {
       router.push('/student/dashboard')
-    } else {
+    } else if (role === 'teacher') {
+      router.push('/teacher/dashboard') // 👈 টিচার এখন এখানে যাবে
+    } else if (role === 'admin') {
       router.push('/admin/dashboard')
+    } else {
+      // যদি রোল না মেলে
+      errorMessage.value = 'Unknown User Role'
     }
   } catch (error) {
+    console.error(error)
     if (error.response && error.response.data) {
       errorMessage.value = error.response.data.message
     } else {
-      errorMessage.value = 'Network Error'
+      errorMessage.value = 'Network Error or Invalid Credentials'
     }
   } finally {
     isLoading.value = false

@@ -8,20 +8,32 @@ const router = useRouter()
 const teacher = ref(null)
 const isLoading = ref(true)
 
-// ইমেজ পাথ হ্যান্ডেল করার জন্য বেস ইউআরএল
-const storageUrl = 'http://127.0.0.1:8000/storage/'
-
 const fetchTeacherProfile = async () => {
   try {
     const token = localStorage.getItem('token')
     const response = await axios.get(`http://127.0.0.1:8000/api/teachers/${route.params.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    // ApiResponse এর কারণে data.data ব্যবহার করা হয়েছে
-    teacher.value = response.data.data
-    isLoading.value = false
+
+    const data = response.data.data
+    teacher.value = {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      designation: data.teacher_profile?.designation || 'Teacher',
+      qualification: data.teacher_profile?.qualification || 'N/A',
+      phone: data.teacher_profile?.phone || 'N/A',
+      joining_date: data.teacher_profile?.joining_date || 'N/A',
+      blood_group: data.teacher_profile?.blood_group || 'N/A',
+      image: data.teacher_profile?.image
+        ? data.teacher_profile.image.startsWith('http')
+          ? data.teacher_profile.image
+          : `http://127.0.0.1:8000/storage/${data.teacher_profile.image}`
+        : null,
+    }
   } catch (error) {
-    console.error('প্রোফাইল লোড করতে সমস্যা:', error)
+    console.error('Profile load error:', error)
+  } finally {
     isLoading.value = false
   }
 }
@@ -30,258 +42,299 @@ onMounted(fetchTeacherProfile)
 </script>
 
 <template>
-  <div class="profile-container">
-    <div v-if="isLoading" class="loading">
+  <div class="page-container">
+    <div class="header-action">
+      <div>
+        <h2 class="page-title">👤 Teacher Profile</h2>
+        <p class="page-subtitle">View detailed information about the teacher</p>
+      </div>
+      <button @click="router.back()" class="back-btn">
+        <span class="icon">⬅</span> Back to List
+      </button>
+    </div>
+
+    <div v-if="isLoading" class="loading-state">
       <div class="spinner"></div>
-      <p>প্রোফাইল লোড হচ্ছে...</p>
+      <p>Loading profile...</p>
     </div>
 
     <div v-else-if="teacher" class="profile-card">
-      <div class="card-header">
-        <button @click="router.back()" class="back-btn">← ব্যাক</button>
-        <h2>শিক্ষক প্রোফাইল</h2>
-        <button @click="router.push(`/admin/teachers/edit/${teacher.id}`)" class="edit-btn">
-          ✏️ এডিট
-        </button>
-      </div>
-
-      <div class="profile-body">
-        <div class="profile-left">
-          <div class="avatar-container">
-            <img
-              v-if="teacher.teacher_profile?.image"
-              :src="storageUrl + teacher.teacher_profile.image"
-              class="avatar-img"
-              alt="Teacher Image"
-            />
-            <div v-else class="avatar-large">
-              {{ teacher.name.charAt(0) }}
-            </div>
-          </div>
-
-          <h3 class="name">{{ teacher.name }}</h3>
-          <p class="role-badge">{{ teacher.teacher_profile?.designation || 'শিক্ষক' }}</p>
-          <p class="email">📧 {{ teacher.email }}</p>
+      <div class="profile-header">
+        <div class="image-wrapper">
+          <img v-if="teacher.image" :src="teacher.image" class="profile-img" alt="Teacher Photo" />
+          <div v-else class="avatar-placeholder">{{ teacher.name.charAt(0) }}</div>
         </div>
 
-        <div class="profile-right">
-          <div class="info-group">
-            <label>মোবাইল নম্বর:</label>
-            <p>{{ teacher.teacher_profile?.phone || 'N/A' }}</p>
-          </div>
+        <div class="user-meta">
+          <h3 class="user-name">{{ teacher.name }}</h3>
+          <p class="designation">{{ teacher.designation }}</p>
+          <div class="status-badge">Active Teacher</div>
+        </div>
 
-          <div class="info-group">
-            <label>রক্তের গ্রুপ:</label>
-            <p class="blood-text">{{ teacher.teacher_profile?.blood_group || 'N/A' }}</p>
-          </div>
-
-          <div class="info-group">
-            <label>শিক্ষাগত যোগ্যতা:</label>
-            <p>{{ teacher.teacher_profile?.qualification || 'N/A' }}</p>
-          </div>
-
-          <div class="info-group">
-            <label>যোগদানের তারিখ:</label>
-            <p>{{ teacher.teacher_profile?.joining_date || 'N/A' }}</p>
-          </div>
-
-          <div class="info-group">
-            <label>স্ট্যাটাস:</label>
-            <span class="status-active">Active</span>
-          </div>
-
-          <div class="info-group">
-            <label>ইউজার আইডি:</label>
-            <p>#{{ teacher.id }}</p>
-          </div>
+        <div class="header-actions">
+          <button @click="router.push(`/admin/teachers/edit/${teacher.id}`)" class="edit-btn">
+            ✏️ Edit Profile
+          </button>
+          <button @click="router.push(`/admin/teachers/id-card/${teacher.id}`)" class="id-btn">
+            🆔 ID Card
+          </button>
         </div>
       </div>
 
-      <div class="card-footer">
-        <button @click="router.push(`/admin/teachers/id-card/${teacher.id}`)" class="id-btn">
-          🆔 আইডি কার্ড জেনারেট করুন
-        </button>
+      <div class="divider"></div>
+
+      <div class="details-section">
+        <h4 class="section-title">📝 Personal Information</h4>
+        <div class="grid-container">
+          <div class="detail-item">
+            <label>Email Address</label>
+            <span>{{ teacher.email }}</span>
+          </div>
+
+          <div class="detail-item">
+            <label>Phone Number</label>
+            <span>{{ teacher.phone }}</span>
+          </div>
+
+          <div class="detail-item">
+            <label>Qualification</label>
+            <span>{{ teacher.qualification }}</span>
+          </div>
+
+          <div class="detail-item">
+            <label>Blood Group</label>
+            <span class="blood-badge">{{ teacher.blood_group }}</span>
+          </div>
+
+          <div class="detail-item">
+            <label>Joining Date</label>
+            <span>{{ teacher.joining_date }}</span>
+          </div>
+
+          <div class="detail-item">
+            <label>Teacher ID</label>
+            <span class="highlight">#TCH-{{ teacher.id }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div v-else class="error-box">
-      <p>দুঃখিত, শিক্ষকের তথ্য পাওয়া যায়নি!</p>
-      <button @click="router.back()">ফিরে যান</button>
+    <div v-else class="error-state">
+      <p>⚠️ Teacher information not found!</p>
     </div>
   </div>
 </template>
 
 <style scoped>
-.profile-container {
-  max-width: 850px;
-  margin: 2rem auto;
-  font-family: 'Segoe UI', sans-serif;
+/* Page Layout */
+.page-container {
+  padding: 25px;
+  color: #fff;
+  max-width: 900px;
+  margin: 0 auto;
 }
-.profile-card {
-  background: white;
-  border-radius: 20px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  border: 1px solid #f1f5f9;
-}
-.card-header {
-  background: #f8fafc;
-  padding: 1.5rem 2rem;
+.header-action {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 25px;
 }
-.profile-body {
-  display: flex;
-  flex-wrap: wrap;
-  padding: 3rem 2rem;
-  gap: 3rem;
-}
-
-/* বাম পাশ - ছবি ও বেসিক তথ্য */
-.profile-left {
-  flex: 1;
-  min-width: 250px;
-  text-align: center;
-  border-right: 1px solid #f1f5f9;
-  padding-right: 2rem;
-}
-.avatar-container {
-  width: 150px;
-  height: 150px;
-  margin: 0 auto 1.5rem;
-}
-.avatar-img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 4px solid #e0e7ff;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-.avatar-large {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #6366f1, #4338ca);
-  color: white;
-  font-size: 60px;
-  font-weight: bold;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-}
-.name {
-  margin: 0;
-  color: #1e293b;
-  font-size: 1.8rem;
+.page-title {
+  font-size: 26px;
   font-weight: 700;
-}
-.role-badge {
-  background: #e0e7ff;
-  color: #4338ca;
-  padding: 5px 15px;
-  border-radius: 30px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  display: inline-block;
-  margin: 0.8rem 0;
-}
-.email {
-  color: #64748b;
-  font-size: 0.95rem;
-}
-
-/* ডান পাশ - বিস্তারিত তথ্য */
-.profile-right {
-  flex: 1.5;
-  min-width: 300px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-}
-.info-group label {
-  display: block;
-  color: #94a3b8;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-}
-.info-group p {
-  color: #334155;
-  font-weight: 600;
-  font-size: 1.1rem;
   margin: 0;
-}
-.blood-text {
-  color: #dc2626 !important; /* লাল রঙ ব্লাড গ্রুপের জন্য */
-}
-.status-active {
-  color: #16a34a;
-  background: #dcfce7;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-weight: bold;
-  font-size: 0.85rem;
-  display: inline-block;
-}
-
-/* ফুটার সেকশন */
-.card-footer {
-  padding: 1.5rem 2rem;
-  background: #f8fafc;
-  text-align: center;
-  border-top: 1px solid #e2e8f0;
-}
-.id-btn {
-  background: #7e22ce;
   color: white;
-  border: none;
-  padding: 12px 25px;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: 0.3s;
 }
-.id-btn:hover {
-  background: #6b21a8;
-  transform: translateY(-2px);
+.page-subtitle {
+  color: #a1a5b7;
+  font-size: 14px;
+  margin-top: 5px;
 }
 
-.back-btn,
-.edit-btn {
-  border: none;
+/* Back Button */
+.back-btn {
+  background: #2b2b40;
+  color: #a1a5b7;
+  border: 1px solid #323248;
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
-  transition: 0.2s;
+  transition: 0.3s;
 }
-.back-btn {
-  background: #e2e8f0;
-  color: #475569;
+.back-btn:hover {
+  background: #323248;
+  color: white;
+}
+
+/* Profile Card */
+.profile-card {
+  background: #1e1e2d;
+  border-radius: 12px;
+  border: 1px solid #2b2b40;
+  overflow: hidden;
+}
+
+/* Header Section */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  padding: 30px;
+  background: #151521;
+}
+.image-wrapper {
+  position: relative;
+}
+.profile-img {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #7c3aed;
+}
+.avatar-placeholder {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  font-weight: bold;
+  border: 3px solid #2b2b40;
+}
+.user-meta {
+  flex: 1;
+}
+.user-name {
+  font-size: 24px;
+  margin: 0;
+  color: white;
+  font-weight: 700;
+}
+.designation {
+  color: #a1a5b7;
+  margin: 5px 0 10px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-badge {
+  display: inline-block;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+.edit-btn,
+.id-btn {
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: 0.3s;
 }
 .edit-btn {
-  background: #2563eb;
+  background: #3b82f6;
   color: white;
 }
 .edit-btn:hover {
-  background: #1d4ed8;
+  background: #2563eb;
+}
+.id-btn {
+  background: #7c3aed;
+  color: white;
+}
+.id-btn:hover {
+  background: #6d28d9;
 }
 
-/* লোডিং স্পিনার */
+.divider {
+  height: 1px;
+  background: #2b2b40;
+  width: 100%;
+}
+
+/* Details Section */
+.details-section {
+  padding: 30px;
+}
+.section-title {
+  font-size: 16px;
+  color: #3b82f6;
+  margin-bottom: 20px;
+  font-weight: 700;
+  border-bottom: 1px solid #2b2b40;
+  padding-bottom: 10px;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 25px;
+}
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.detail-item label {
+  font-size: 12px;
+  color: #a1a5b7;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.detail-item span {
+  font-size: 15px;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+/* Badges */
+.highlight {
+  font-weight: 700;
+  color: white;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+}
+.blood-badge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: bold;
+  width: fit-content;
+}
+
+/* Loading */
+.loading-state,
+.error-state {
+  text-align: center;
+  padding: 50px;
+  color: #a1a5b7;
+}
 .spinner {
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #6366f1;
-  border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
+  margin: 0 auto 15px;
 }
 @keyframes spin {
   0% {
@@ -292,15 +345,17 @@ onMounted(fetchTeacherProfile)
   }
 }
 
-@media (max-width: 640px) {
-  .profile-right {
+/* Responsive */
+@media (max-width: 600px) {
+  .profile-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  .grid-container {
     grid-template-columns: 1fr;
   }
-  .profile-left {
-    border-right: none;
-    border-bottom: 1px solid #f1f5f9;
-    padding-right: 0;
-    padding-bottom: 2rem;
+  .header-actions {
+    justify-content: center;
   }
 }
 </style>

@@ -11,14 +11,12 @@ const isLoading = ref(false)
 const showModal = ref(false)
 const selectedStudentCard = ref(null)
 
-// ✅ পরিবর্তন ১: স্কুল ইনফো এখন রিয়েক্টিভ (ডাটাবেস থেকে আসবে)
+// স্কুলের তথ্য
 const schoolInfo = ref({
-  name: 'স্কুলের নাম লোড হচ্ছে...',
+  name: 'Loading School Name...',
   address: '',
   logo: '',
 })
-
-const token = localStorage.getItem('token')
 
 const filter = ref({
   class_id: '',
@@ -27,19 +25,18 @@ const filter = ref({
   year: new Date().getFullYear(),
 })
 
-const apiConfig = {
-  headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-}
-
-// ✅ পরিবর্তন ২: সেটিংস ডাটা ফেচ করা (নাম ও লোগো)
+// ২. সেটিংস ডাটা ফেচ করা
 const fetchSettings = async () => {
   try {
-    const res = await axios.get('http://127.0.0.1:8000/api/general-settings', apiConfig)
+    const token = localStorage.getItem('token')
+    const res = await axios.get('http://127.0.0.1:8000/api/general-settings', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
     if (res.data.data) {
       schoolInfo.value = {
         name: res.data.data.school_name,
         address: res.data.data.school_address,
-        logo: res.data.data.logo_url, // ব্যাকএন্ডের Accessor
+        logo: res.data.data.logo_url,
       }
     }
   } catch (error) {
@@ -50,7 +47,10 @@ const fetchSettings = async () => {
 // ৩. অন্যান্য ডাটা ফেচিং
 const fetchClasses = async () => {
   try {
-    const res = await axios.get('http://127.0.0.1:8000/api/academic/classes', apiConfig)
+    const token = localStorage.getItem('token')
+    const res = await axios.get('http://127.0.0.1:8000/api/academic/classes', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
     classes.value = res.data.data
   } catch (error) {
     console.error(error)
@@ -62,26 +62,44 @@ const handleClassChange = async () => {
     sections.value = []
     return
   }
-  const res = await axios.get(
-    `http://127.0.0.1:8000/api/academic/classes/${filter.value.class_id}/sections`,
-    apiConfig,
-  )
-  sections.value = res.data.data
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.get(
+      `http://127.0.0.1:8000/api/academic/classes/${filter.value.class_id}/sections`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    sections.value = res.data.data
+  } catch (error) {
+    console.error(error)
+  }
 }
 
 const fetchReport = async () => {
   if (!filter.value.class_id || !filter.value.section_id) {
-    return Swal.fire('সতর্কতা', 'ক্লাস এবং সেকশন সিলেক্ট করুন', 'warning')
+    return Swal.fire({
+      icon: 'warning',
+      title: 'Warning',
+      text: 'Please select class and section.',
+      background: '#1e1e2d',
+      color: '#fff',
+    })
   }
   isLoading.value = true
   try {
+    const token = localStorage.getItem('token')
     const res = await axios.get('http://127.0.0.1:8000/api/attendance/report', {
-      ...apiConfig,
+      headers: { Authorization: `Bearer ${token}` },
       params: filter.value,
     })
     reportData.value = res.data.data
   } catch (error) {
-    Swal.fire('ভুল হয়েছে', 'সার্ভার থেকে রিপোর্ট পাওয়া যায়নি।', 'error')
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Failed to fetch report.',
+      background: '#1e1e2d',
+      color: '#fff',
+    })
   } finally {
     isLoading.value = false
   }
@@ -89,17 +107,24 @@ const fetchReport = async () => {
 
 const viewStudentCard = async (studentId) => {
   try {
+    const token = localStorage.getItem('token')
     const res = await axios.get(
       `http://127.0.0.1:8000/api/attendance/student/${studentId}/report-card`,
       {
-        ...apiConfig,
+        headers: { Authorization: `Bearer ${token}` },
         params: { month: filter.value.month, year: filter.value.year },
       },
     )
     selectedStudentCard.value = res.data.data
     showModal.value = true
   } catch (error) {
-    Swal.fire('এরর', 'কার্ড লোড করা যায়নি', 'error')
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Failed to load card.',
+      background: '#1e1e2d',
+      color: '#fff',
+    })
   }
 }
 
@@ -126,12 +151,10 @@ const calculatePercent = (item) => {
   return total === 0 ? 0 : ((item.present_count / total) * 100).toFixed(1)
 }
 
-// প্রিন্ট ফাংশন
 const printReport = () => {
   window.print()
 }
 
-// ✅ পরিবর্তন ৩: মাউন্ট হওয়ার সাথে সাথে সেটিংস কল করা
 onMounted(() => {
   fetchClasses()
   fetchSettings()
@@ -139,73 +162,127 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page-wrapper">
-    <div class="screen-view">
+  <div class="page-container">
+    <div class="screen-view no-print">
+      <div class="header-action">
+        <div>
+          <h2 class="page-title">📊 Attendance Report</h2>
+          <p class="page-subtitle">View monthly attendance summary</p>
+        </div>
+      </div>
+
       <div class="filter-card">
-        <h3>📊 হাজিরা রিপোর্ট ফিল্টার</h3>
-        <div class="filters">
+        <div class="filter-group">
+          <label>Class</label>
           <select v-model="filter.class_id" @change="handleClassChange">
-            <option value="">ক্লাস সিলেক্ট করুন</option>
+            <option value="">Select Class</option>
             <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
+        </div>
+
+        <div class="filter-group">
+          <label>Section</label>
           <select v-model="filter.section_id">
-            <option value="">সেকশন সিলেক্ট করুন</option>
+            <option value="">Select Section</option>
             <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
           </select>
+        </div>
+
+        <div class="filter-group">
+          <label>Month</label>
           <select v-model="filter.month">
             <option v-for="m in 12" :key="m" :value="m">{{ getMonthName(m) }}</option>
           </select>
+        </div>
+
+        <div class="filter-group">
+          <label>Year</label>
           <select v-model="filter.year">
             <option v-for="y in [2024, 2025, 2026]" :key="y" :value="y">{{ y }}</option>
           </select>
-          <button @click="fetchReport" class="btn-search" :disabled="isLoading">
-            🔍 রিপোর্ট দেখুন
-          </button>
+        </div>
 
-          <button v-if="reportData.length > 0" @click="printReport" class="btn-print">
-            🖨️ প্রিন্ট করুন
+        <div class="button-group">
+          <button @click="fetchReport" class="btn search-btn" :disabled="isLoading">
+            {{ isLoading ? 'Loading...' : '🔍 Search' }}
+          </button>
+          <button v-if="reportData.length > 0" @click="printReport" class="btn print-btn">
+            🖨️ Print
           </button>
         </div>
       </div>
 
-      <div v-if="reportData.length > 0" class="report-table-card">
-        <h4 class="text-dark">ফলাফল: {{ getMonthName(filter.month) }}, {{ filter.year }}</h4>
-        <table class="dashboard-table">
-          <thead>
-            <tr>
-              <th>রোল</th>
-              <th>নাম</th>
-              <th>P</th>
-              <th>A</th>
-              <th>%</th>
-              <th>অ্যাকশন</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in reportData" :key="item.id">
-              <td>{{ item.roll_no }}</td>
-              <td class="font-bold">{{ item.name }}</td>
-              <td class="text-success">{{ item.present_count }}</td>
-              <td class="text-danger">{{ item.absent_count }}</td>
-              <td>{{ calculatePercent(item) }}%</td>
-              <td><button @click="viewStudentCard(item.id)" class="btn-view">👁️ কার্ড</button></td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-if="reportData.length > 0" class="table-card">
+        <div class="table-header">
+          <h4>Results: {{ getMonthName(filter.month) }}, {{ filter.year }}</h4>
+        </div>
+        <div class="table-responsive">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Roll No</th>
+                <th>Student Name</th>
+                <th>Present</th>
+                <th>Absent</th>
+                <th>Late</th>
+                <th>Percentage</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in reportData" :key="item.id">
+                <td class="roll-col">{{ item.roll_no }}</td>
+                <td class="name-col">{{ item.name }}</td>
+                <td class="text-success">{{ item.present_count }}</td>
+                <td class="text-danger">{{ item.absent_count }}</td>
+                <td class="text-warning">{{ item.late_count }}</td>
+                <td class="percent-col">{{ calculatePercent(item) }}%</td>
+                <td>
+                  <button @click="viewStudentCard(item.id)" class="btn-icon view" title="View Card">
+                    👁️
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div v-if="showModal" class="modal-overlay">
+      <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
         <div class="modal-content">
           <div class="modal-header">
-            <h3>কার্ড প্রিভিউ</h3>
-            <button @click="showModal = false">×</button>
+            <h3>Student Card Preview</h3>
+            <button @click="showModal = false" class="close-btn">×</button>
           </div>
-          <div class="card-body" v-if="selectedStudentCard">
-            <p>নাম: {{ selectedStudentCard.student_info.name }}</p>
-            <p>
-              উপস্থিত: {{ selectedStudentCard.summary.present }} | অনুপস্থিত:
-              {{ selectedStudentCard.summary.absent }}
-            </p>
+          <div class="modal-body" v-if="selectedStudentCard">
+            <div class="student-info">
+              <img
+                v-if="selectedStudentCard.student_info.image"
+                :src="selectedStudentCard.student_info.image"
+                class="student-img"
+              />
+              <div v-else class="avatar-placeholder">
+                {{ selectedStudentCard.student_info.name.charAt(0) }}
+              </div>
+              <div>
+                <h4>{{ selectedStudentCard.student_info.name }}</h4>
+                <p>Roll: {{ selectedStudentCard.student_info.roll_no }}</p>
+              </div>
+            </div>
+            <div class="stats-grid">
+              <div class="stat-box present">
+                <span>Present</span>
+                <strong>{{ selectedStudentCard.summary.present }}</strong>
+              </div>
+              <div class="stat-box absent">
+                <span>Absent</span>
+                <strong>{{ selectedStudentCard.summary.absent }}</strong>
+              </div>
+              <div class="stat-box late">
+                <span>Late</span>
+                <strong>{{ selectedStudentCard.summary.late }}</strong>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -217,19 +294,20 @@ onMounted(() => {
         <div class="print-school-info">
           <h1>{{ schoolInfo.name }}</h1>
           <p>{{ schoolInfo.address }}</p>
-          <h3>মাসিক হাজিরা রিপোর্ট - {{ getMonthName(filter.month) }}, {{ filter.year }}</h3>
+          <h3>Monthly Attendance Report - {{ getMonthName(filter.month) }}, {{ filter.year }}</h3>
         </div>
       </div>
 
       <table class="print-table">
         <thead>
           <tr>
-            <th>রোল</th>
-            <th class="text-left">নাম</th>
-            <th>মোট ক্লাস</th>
-            <th>উপস্থিত</th>
-            <th>অনুপস্থিত</th>
-            <th>শতকরা</th>
+            <th>Roll No</th>
+            <th class="text-left">Student Name</th>
+            <th>Total Classes</th>
+            <th>Present</th>
+            <th>Absent</th>
+            <th>Late</th>
+            <th>Percentage</th>
           </tr>
         </thead>
         <tbody>
@@ -239,130 +317,297 @@ onMounted(() => {
             <td>{{ item.present_count + item.absent_count + item.late_count }}</td>
             <td>{{ item.present_count }}</td>
             <td>{{ item.absent_count }}</td>
+            <td>{{ item.late_count }}</td>
             <td>{{ calculatePercent(item) }}%</td>
           </tr>
         </tbody>
       </table>
 
       <div class="print-footer">
-        <div class="signature">___________________<br />শ্রেণি শিক্ষক</div>
-        <div class="signature">___________________<br />অধ্যক্ষ</div>
+        <div class="signature">___________________<br />Class Teacher</div>
+        <div class="signature">___________________<br />Principal</div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* ড্যাশবোর্ড স্টাইল */
-.page-wrapper {
-  padding: 20px;
+/* Page Layout */
+.page-container {
+  padding: 25px;
+  color: #fff;
+  max-width: 1000px;
+  margin: 0 auto;
 }
-.filter-card {
-  background: #1e293b;
+.header-action {
+  margin-bottom: 25px;
+}
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
   color: white;
+}
+.page-subtitle {
+  color: #a1a5b7;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+/* Filter Card */
+.filter-card {
+  background: #1e1e2d;
   padding: 20px;
   border-radius: 12px;
-  margin-bottom: 20px;
-}
-.filters {
+  margin-bottom: 25px;
   display: flex;
-  gap: 10px;
+  gap: 15px;
+  align-items: flex-end;
   flex-wrap: wrap;
+  border: 1px solid #2b2b40;
 }
-select,
-button {
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 150px;
+}
+.filter-group label {
+  color: #a1a5b7;
+  font-size: 13px;
+  font-weight: 600;
+}
+.filter-group select {
   padding: 10px;
-  border-radius: 6px;
+  background: #151521;
+  border: 1px solid #2b2b40;
+  border-radius: 8px;
+  color: white;
+  outline: none;
+  width: 100%;
   cursor: pointer;
 }
-.btn-search {
-  background: #2563eb;
-  color: white;
-  border: none;
+.button-group {
+  display: flex;
+  gap: 10px;
 }
-.btn-print {
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.search-btn {
+  background: #3b82f6;
+  color: white;
+}
+.search-btn:hover {
+  background: #2563eb;
+}
+.print-btn {
   background: #10b981;
   color: white;
-  border: none;
 }
-.btn-view {
-  background: #f59e0b;
-  color: white;
-  border: none;
-  padding: 5px 10px;
+.print-btn:hover {
+  background: #059669;
 }
-.report-table-card {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
+
+/* Table Card */
+.table-card {
+  background: #1e1e2d;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #2b2b40;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
-.text-dark {
-  color: #333;
+.table-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid #2b2b40;
+  background: #151521;
 }
-.dashboard-table {
+.table-header h4 {
+  margin: 0;
+  color: #3b82f6;
+}
+
+.custom-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
+  text-align: center;
 }
-.dashboard-table th,
-.dashboard-table td {
-  border: 1px solid #ddd;
-  padding: 10px;
-  color: #333;
+.custom-table th {
+  background: #151521;
+  padding: 15px;
+  color: #a1a5b7;
+  font-weight: 600;
+  font-size: 13px;
+  border-bottom: 1px solid #2b2b40;
+}
+.custom-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #2b2b40;
+  color: #e2e8f0;
+  vertical-align: middle;
+}
+.roll-col {
+  font-weight: bold;
+  color: #a1a5b7;
+}
+.name-col {
+  text-align: left;
+  font-weight: 600;
+  color: white;
 }
 .text-success {
-  color: green;
+  color: #10b981;
   font-weight: bold;
 }
 .text-danger {
-  color: red;
+  color: #ef4444;
   font-weight: bold;
 }
+.text-warning {
+  color: #f59e0b;
+  font-weight: bold;
+}
+.percent-col {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+}
+
+/* Action Button */
+.btn-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.3s;
+}
+.view {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+.view:hover {
+  background: #f59e0b;
+  color: white;
+}
+
+/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
 }
 .modal-content {
-  background: white;
-  padding: 20px;
-  width: 300px;
-  border-radius: 8px;
-  color: black;
+  background: #1e1e2d;
+  padding: 25px;
+  width: 350px;
+  border-radius: 12px;
+  border: 1px solid #2b2b40;
+  color: white;
 }
 .modal-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #2b2b40;
+  padding-bottom: 10px;
+}
+.close-btn {
+  background: none;
+  border: none;
+  color: #a1a5b7;
+  font-size: 20px;
+  cursor: pointer;
 }
 
-/* প্রিন্ট ভিউ শুরুতে হাইড থাকবে */
+.student-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+.student-img {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.avatar-placeholder {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #3b82f6;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  text-align: center;
+}
+.stat-box {
+  padding: 10px;
+  border-radius: 8px;
+  background: #151521;
+  border: 1px solid #2b2b40;
+}
+.stat-box span {
+  display: block;
+  font-size: 11px;
+  color: #a1a5b7;
+}
+.stat-box strong {
+  font-size: 16px;
+  display: block;
+  margin-top: 5px;
+}
+.stat-box.present strong {
+  color: #10b981;
+}
+.stat-box.absent strong {
+  color: #ef4444;
+}
+.stat-box.late strong {
+  color: #f59e0b;
+}
+
+/* Print Styles */
 .print-view-container {
   display: none;
 }
 
-/* =========================================
-   🔥 প্রিন্ট ফিক্স (Blank Page Solution)
-   ========================================= */
 @media print {
-  /* ১. বডির সবকিছু অদৃশ্য করে দাও */
   body * {
     visibility: hidden;
   }
+  .no-print {
+    display: none !important;
+  }
 
-  /* ২. শুধুমাত্র প্রিন্ট কন্টেইনার এবং তার ভেতরের সবকিছু দৃশ্যমান করো */
   .print-view-container,
   .print-view-container * {
     visibility: visible;
   }
-
-  /* ৩. প্রিন্ট কন্টেইনারকে পজিশন করে একদম সামনে নিয়ে আসো */
   .print-view-container {
     display: block !important;
     position: absolute;
@@ -372,10 +617,34 @@ button {
     margin: 0;
     padding: 20px;
     background: white;
+    color: black;
     z-index: 99999;
   }
 
-  /* ৪. প্রিন্ট টেবিল ডিজাইন */
+  .print-header {
+    text-align: center;
+    border-bottom: 2px solid black;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+  }
+  .print-logo {
+    height: 60px;
+    margin-bottom: 10px;
+  }
+  .print-school-info h1 {
+    margin: 0;
+    font-size: 24px;
+    color: black;
+  }
+  .print-school-info p {
+    margin: 5px 0;
+    color: #333;
+  }
+  .print-school-info h3 {
+    margin-top: 10px;
+    color: black;
+  }
+
   .print-table {
     width: 100%;
     border-collapse: collapse;
@@ -386,32 +655,7 @@ button {
     border: 1px solid black !important;
     padding: 8px;
     text-align: center;
-    color: black !important;
-    font-size: 14px;
-  }
-  .print-header {
-    text-align: center;
-    margin-bottom: 20px;
-    border-bottom: 2px solid black;
-    padding-bottom: 10px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 15px;
-  }
-  .print-logo {
-    height: 60px;
-    object-fit: contain;
-  }
-  .print-school-info h1 {
-    margin: 0;
-    color: black !important;
-    font-size: 24px;
-  }
-  .print-school-info p,
-  h3 {
-    color: black !important;
-    margin: 5px 0;
+    color: black;
   }
   .text-left {
     text-align: left !important;
@@ -425,14 +669,8 @@ button {
     padding: 0 50px;
   }
   .signature {
-    color: black !important;
     text-align: center;
-  }
-
-  /* পেজ মার্জিন সেটআপ */
-  @page {
-    size: A4;
-    margin: 10mm;
+    color: black;
   }
 }
 </style>

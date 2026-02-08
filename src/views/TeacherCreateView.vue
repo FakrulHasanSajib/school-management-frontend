@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
-import Swal from 'sweetalert2' // ✅ SweetAlert ইমপোর্ট
+import Swal from 'sweetalert2'
 
 const router = useRouter()
 const isLoading = ref(false)
@@ -12,7 +12,7 @@ const imagePreview = ref(null)
 const form = ref({
   name: '',
   email: '',
-  password: '12345678',
+  password: '12345678', // Default Password
   designation: '',
   qualification: '',
   phone: '',
@@ -22,7 +22,7 @@ const form = ref({
   address: '',
 })
 
-// ১. ছবি সিলেক্ট ও প্রিভিউ লজিক
+// ১. ছবি প্রিভিউ এবং হ্যান্ডলিং
 const handleFileChange = (event) => {
   const file = event.target.files[0]
   if (file) {
@@ -31,25 +31,24 @@ const handleFileChange = (event) => {
   }
 }
 
-// ২. ফর্ম সাবমিট লজিক
+// ২. সাবমিট ফাংশন
 const handleSubmit = async () => {
   isLoading.value = true
   errors.value = {}
 
-  // টোকেন চেক
   const token = localStorage.getItem('token')
   if (!token) {
     Swal.fire({
       icon: 'warning',
-      title: 'সেশন শেষ',
-      text: 'আপনার সেশন শেষ হয়ে গেছে। দয়া করে আবার লগইন করুন।',
-      confirmButtonColor: '#f59e0b',
+      title: 'Session Expired',
+      text: 'Please login again.',
+      background: '#1e1e2d',
+      color: '#fff',
     })
     router.push('/login')
     return
   }
 
-  // ৩. FormData তৈরি
   const formData = new FormData()
   formData.append('name', form.value.name)
   formData.append('email', form.value.email)
@@ -66,7 +65,6 @@ const handleSubmit = async () => {
   }
 
   try {
-    // ৪. API কল
     await axios.post('http://127.0.0.1:8000/api/teachers', formData, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -74,55 +72,34 @@ const handleSubmit = async () => {
       },
     })
 
-    // ✅ ৫. SweetAlert Success Message
-    Swal.fire({
+    await Swal.fire({
       icon: 'success',
-      title: 'সফল!',
-      text: 'শিক্ষক সফলভাবে যোগ করা হয়েছে! 🎉',
-      confirmButtonText: 'ঠিক আছে',
-      confirmButtonColor: '#10b981',
-      timer: 2000, // ২ সেকেন্ড পর অটো বন্ধ হবে
-    }).then(() => {
-      router.push('/admin/teachers')
+      title: 'Success!',
+      text: 'Teacher added successfully! 🎉',
+      background: '#1e1e2d',
+      color: '#fff',
+      confirmButtonColor: '#3b82f6',
+      timer: 2000,
     })
-  } catch (error) {
-    console.error('Error:', error.response)
 
-    if (error.response) {
-      if (error.response.status === 422) {
-        // ✅ ভ্যালিডেশন এরর এলার্ট
-        errors.value = error.response.data.errors
-        Swal.fire({
-          icon: 'error',
-          title: 'যাচাইকরণ ব্যর্থ!',
-          text: 'দয়া করে ফর্মের লাল দাগ দেওয়া ফিল্ডগুলো চেক করুন।',
-          confirmButtonColor: '#ef4444',
-        })
-      } else if (error.response.status === 401) {
-        // ✅ অথেন্টিকেশন এরর এলার্ট
-        Swal.fire({
-          icon: 'error',
-          title: 'অননুমোদিত',
-          text: 'আপনার লগইন সেশন শেষ। আবার লগইন করুন।',
-          confirmButtonColor: '#ef4444',
-        })
-        router.push('/login')
-      } else {
-        // ✅ সার্ভার এরর এলার্ট
-        Swal.fire({
-          icon: 'error',
-          title: 'সার্ভার এরর!',
-          text: 'দুঃখিত, সার্ভারে কোনো সমস্যা হয়েছে।',
-          confirmButtonColor: '#ef4444',
-        })
-      }
-    } else {
-      // ✅ নেটওয়ার্ক এরর এলার্ট
+    router.push('/teachers') // লিস্ট পেজে রিডাইরেক্ট
+  } catch (error) {
+    if (error.response && error.response.status === 422) {
+      errors.value = error.response.data.errors
       Swal.fire({
         icon: 'error',
-        title: 'নেটওয়ার্ক সমস্যা!',
-        text: 'সার্ভারের সাথে সংযোগ স্থাপন করা যাচ্ছে না।',
-        confirmButtonColor: '#ef4444',
+        title: 'Validation Error',
+        text: 'Please check the form for errors.',
+        background: '#1e1e2d',
+        color: '#fff',
+      })
+    } else {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error!',
+        text: 'Something went wrong.',
+        background: '#1e1e2d',
+        color: '#fff',
       })
     }
   } finally {
@@ -132,90 +109,81 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="form-wrapper">
+  <div class="page-wrapper">
     <div class="glass-card">
       <div class="card-header">
-        <h3>➕ নতুন শিক্ষক যোগ করুন</h3>
-        <p class="subtitle">নিচের ফর্মে শিক্ষকের সঠিক তথ্য প্রদান করুন</p>
+        <div class="header-content">
+          <h3>➕ Add New Teacher</h3>
+          <p>Fill in the details to register a new teacher.</p>
+        </div>
+        <button @click="router.back()" class="back-btn">⬅ Back</button>
       </div>
 
       <form @submit.prevent="handleSubmit">
         <div class="form-grid">
           <div class="form-group">
-            <label>নাম <span class="required">*</span></label>
-            <div class="input-box">
+            <label>Full Name <span class="required">*</span></label>
+            <div class="input-wrapper">
               <span class="icon">👤</span>
               <input
                 v-model="form.name"
                 type="text"
-                placeholder="শিক্ষকের নাম লিখুন"
-                :class="{ 'has-error': errors.name }"
+                placeholder="Enter full name"
+                :class="{ 'error-border': errors.name }"
               />
             </div>
             <span v-if="errors.name" class="error-msg">{{ errors.name[0] }}</span>
           </div>
 
           <div class="form-group">
-            <label>ইমেইল <span class="required">*</span></label>
-            <div class="input-box">
+            <label>Email Address <span class="required">*</span></label>
+            <div class="input-wrapper">
               <span class="icon">📧</span>
               <input
                 v-model="form.email"
                 type="email"
-                placeholder="email@school.com"
-                :class="{ 'has-error': errors.email }"
+                placeholder="teacher@school.com"
+                :class="{ 'error-border': errors.email }"
               />
             </div>
             <span v-if="errors.email" class="error-msg">{{ errors.email[0] }}</span>
           </div>
 
           <div class="form-group">
-            <label>পদবী (Designation) <span class="required">*</span></label>
-            <div class="input-box">
+            <label>Designation <span class="required">*</span></label>
+            <div class="input-wrapper">
               <span class="icon">🎓</span>
               <input
                 v-model="form.designation"
                 type="text"
-                placeholder="যেমন: Senior Teacher"
-                :class="{ 'has-error': errors.designation }"
+                placeholder="e.g. Senior Teacher"
+                :class="{ 'error-border': errors.designation }"
               />
             </div>
-            <span v-if="errors.designation" class="error-msg">{{ errors.designation[0] }}</span>
           </div>
 
           <div class="form-group">
-            <label>শিক্ষাগত যোগ্যতা</label>
-            <div class="input-box">
+            <label>Qualification</label>
+            <div class="input-wrapper">
               <span class="icon">📜</span>
-              <input
-                v-model="form.qualification"
-                type="text"
-                placeholder="যেমন: M.Sc in Math"
-                :class="{ 'has-error': errors.qualification }"
-              />
+              <input v-model="form.qualification" type="text" placeholder="e.g. M.Sc in Math" />
             </div>
-            <span v-if="errors.qualification" class="error-msg">{{ errors.qualification[0] }}</span>
           </div>
 
           <div class="form-group">
-            <label>ফোন নম্বর</label>
-            <div class="input-box">
+            <label>Phone Number</label>
+            <div class="input-wrapper">
               <span class="icon">📞</span>
-              <input
-                v-model="form.phone"
-                type="text"
-                placeholder="017XXXXXXXX"
-                :class="{ 'has-error': errors.phone }"
-              />
+              <input v-model="form.phone" type="text" placeholder="017XXXXXXXX" />
             </div>
           </div>
 
           <div class="form-group">
-            <label>রক্তের গ্রুপ</label>
-            <div class="input-box">
+            <label>Blood Group</label>
+            <div class="input-wrapper">
               <span class="icon">🩸</span>
-              <select v-model="form.blood_group" class="input-select">
-                <option value="">নির্বাচন করুন</option>
+              <select v-model="form.blood_group">
+                <option value="">Select Group</option>
                 <option value="A+">A+</option>
                 <option value="A-">A-</option>
                 <option value="B+">B+</option>
@@ -229,34 +197,39 @@ const handleSubmit = async () => {
           </div>
 
           <div class="form-group">
-            <label>যোগদানের তারিখ <span class="required">*</span></label>
-            <div class="input-box">
+            <label>Joining Date <span class="required">*</span></label>
+            <div class="input-wrapper">
               <span class="icon">📅</span>
               <input
                 v-model="form.joining_date"
                 type="date"
-                :class="{ 'has-error': errors.joining_date }"
+                :class="{ 'error-border': errors.joining_date }"
               />
             </div>
-            <span v-if="errors.joining_date" class="error-msg">{{ errors.joining_date[0] }}</span>
           </div>
 
-          <div class="form-group">
-            <label>শিক্ষকের ছবি</label>
-            <div class="file-upload-box">
-              <input type="file" @change="handleFileChange" accept="image/*" class="file-input" />
-              <div v-if="imagePreview" class="preview-box">
-                <img :src="imagePreview" class="preview-img" alt="Preview" />
-              </div>
+          <div class="form-group upload-group">
+            <label>Teacher Photo</label>
+            <div class="upload-box">
+              <input
+                type="file"
+                @change="handleFileChange"
+                accept="image/*"
+                id="file"
+                class="file-input"
+              />
+              <label for="file" class="upload-label">
+                <span v-if="!imagePreview">📷 Upload Photo</span>
+                <img v-else :src="imagePreview" class="preview-img" />
+              </label>
             </div>
           </div>
         </div>
 
         <div class="form-actions">
-          <button type="button" class="cancel-btn" @click="router.back()">বাতিল</button>
           <button type="submit" :disabled="isLoading" class="submit-btn">
             <span v-if="isLoading" class="spinner"></span>
-            {{ isLoading ? 'সেভ হচ্ছে...' : 'তথ্য সেভ করুন' }}
+            {{ isLoading ? 'Saving...' : '💾 Save Teacher' }}
           </button>
         </div>
       </form>
@@ -265,133 +238,152 @@ const handleSubmit = async () => {
 </template>
 
 <style scoped>
-/* Main Wrapper */
-.form-wrapper {
+/* Page Layout */
+.page-wrapper {
   display: flex;
   justify-content: center;
-  padding: 20px;
+  padding: 40px 20px;
+  background: #151521;
+  min-height: 100vh;
 }
 
-/* Glass/Dark Card Style */
+/* Glass Card */
 .glass-card {
-  background: #2e2e2e;
-  border-radius: 20px;
+  background: #1e1e2d;
+  border-radius: 16px;
   padding: 40px;
   width: 100%;
   max-width: 900px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border: 1px solid #2b2b40;
   color: white;
 }
 
 /* Header */
 .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #2b2b40;
+  padding-bottom: 20px;
   margin-bottom: 30px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 15px;
 }
-.card-header h3 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0 0 5px 0;
-  color: #fff;
-}
-.subtitle {
-  color: #a0a0a0;
-  font-size: 0.9rem;
+.header-content h3 {
+  font-size: 24px;
   margin: 0;
+  color: white;
+  font-weight: 700;
+}
+.header-content p {
+  color: #a1a5b7;
+  font-size: 14px;
+  margin: 5px 0 0;
+}
+.back-btn {
+  background: #2b2b40;
+  color: #a1a5b7;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.back-btn:hover {
+  background: #323248;
+  color: white;
 }
 
-/* Form Grid Layout */
+/* Grid Layout */
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 25px;
 }
-
-/* Inputs Styling */
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
+/* Inputs */
 label {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #d1d5db;
+  font-size: 13px;
+  font-weight: 600;
+  color: #a1a5b7;
 }
 .required {
-  color: #f87171;
+  color: #ef4444;
 }
 
-.input-box {
+.input-wrapper {
   position: relative;
-  display: flex;
-  align-items: center;
 }
-
 .icon {
   position: absolute;
   left: 15px;
-  font-size: 1.1rem;
-  color: #a0a0a0;
-  z-index: 10;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  color: #565674;
+  z-index: 2;
 }
-
 input,
-select.input-select {
+select {
   width: 100%;
-  background: #1f1f1f;
-  border: 1px solid #444;
-  padding: 12px 15px 12px 45px;
-  border-radius: 50px;
+  background: #151521;
+  border: 1px solid #2b2b40;
+  padding: 14px 15px 14px 45px;
+  border-radius: 10px;
   color: white;
-  font-size: 0.95rem;
+  font-size: 14px;
   outline: none;
-  transition: all 0.3s ease;
-  appearance: none;
+  transition: 0.3s;
 }
-
-input::placeholder {
-  color: #666;
-}
-
 input:focus,
 select:focus {
-  border-color: #9b51e0;
-  box-shadow: 0 0 0 3px rgba(155, 81, 224, 0.2);
-  background: #252525;
+  border-color: #3b82f6;
+  background: #1a1a27;
 }
-
-.has-error {
-  border-color: #ef4444;
+.error-border {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1);
 }
 .error-msg {
   color: #ef4444;
-  font-size: 0.8rem;
-  margin-left: 10px;
+  font-size: 12px;
+  margin-top: 2px;
 }
 
-/* File Input & Preview */
-.file-upload-box {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* Upload Box */
+.upload-group {
+  grid-column: span 2;
+}
+.upload-box {
+  width: 120px;
+  height: 120px;
+  border: 2px dashed #2b2b40;
+  border-radius: 12px;
+  background: #151521;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.upload-box:hover {
+  border-color: #3b82f6;
 }
 .file-input {
-  padding: 10px;
-  background: #1f1f1f;
-  border-radius: 10px;
-  border: 1px dashed #555;
-  cursor: pointer;
+  display: none;
 }
-.preview-box {
-  width: 100px;
-  height: 100px;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 2px solid #9b51e0;
+.upload-label {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #a1a5b7;
+  font-size: 12px;
+  cursor: pointer;
 }
 .preview-img {
   width: 100%;
@@ -399,76 +391,49 @@ select:focus {
   object-fit: cover;
 }
 
-/* Date Input Fix */
-input[type='date']::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  cursor: pointer;
-}
-
 /* Buttons */
 .form-actions {
+  grid-column: span 2;
   display: flex;
   justify-content: flex-end;
-  gap: 15px;
   margin-top: 30px;
+  border-top: 1px solid #2b2b40;
   padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  grid-column: span 2;
 }
-
-.cancel-btn {
-  background: transparent;
-  border: 1px solid #555;
-  color: #a0a0a0;
-  padding: 10px 25px;
-  border-radius: 50px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: 0.3s;
-}
-.cancel-btn:hover {
-  background: #333;
-  color: white;
-  border-color: #777;
-}
-
 .submit-btn {
-  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
   border: none;
-  padding: 12px 35px;
-  border-radius: 50px;
+  padding: 14px 40px;
+  border-radius: 10px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 15px;
   display: flex;
   align-items: center;
   gap: 10px;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+  transition: 0.3s;
 }
-
 .submit-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(37, 117, 252, 0.4);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
 }
-
 .submit-btn:disabled {
-  background: #555;
+  background: #2b2b40;
   cursor: not-allowed;
-  transform: none;
+  box-shadow: none;
 }
 
-/* Loading Spinner */
+/* Spinner */
 .spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid #ffffff;
-  border-top-color: transparent;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -480,14 +445,9 @@ input[type='date']::-webkit-calendar-picker-indicator {
   .form-grid {
     grid-template-columns: 1fr;
   }
+  .upload-group,
   .form-actions {
     grid-column: span 1;
-    flex-direction: column-reverse;
-  }
-  .submit-btn,
-  .cancel-btn {
-    width: 100%;
-    justify-content: center;
   }
 }
 </style>

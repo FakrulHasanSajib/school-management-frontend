@@ -2,23 +2,19 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
-import Swal from 'sweetalert2' // সুন্দর এলার্টের জন্য
+import Swal from 'sweetalert2'
 
 const router = useRouter()
 const isLoading = ref(false)
 const errors = ref({})
 
-// ডাটাবেস থেকে আসার জন্য ক্লাস এবং সেকশন ভেরিয়েবল
 const classes = ref([])
 const filteredSections = ref([])
-
-// ছবির প্রিভিউ দেখার জন্য ভেরিয়েবল
 const imagePreview = ref(null)
 
 const form = ref({
   name: '',
   email: '',
-  // password ফিল্ড বাদ দেওয়া হয়েছে (অটোমেটিক 12345678 সেট হবে)
   admission_no: '',
   roll_no: '',
   class_id: '',
@@ -31,37 +27,44 @@ const form = ref({
   image: null,
 })
 
-// একাডেমিক ডাটা লোড
+// ১. একাডেমিক ডাটা লোড
 const fetchAcademicData = async () => {
   try {
-    const classResponse = await axios.get('http://127.0.0.1:8000/api/academic/classes')
+    const token = localStorage.getItem('token')
+    const classResponse = await axios.get('http://127.0.0.1:8000/api/academic/classes', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
     classes.value = classResponse.data.data
   } catch (error) {
-    console.error('একাডেমিক ডাটা সমস্যা:', error)
+    console.error('Academic data error:', error)
   }
 }
 
-// ক্লাস চেঞ্জ হ্যান্ডলার
+// ২. ক্লাস চেঞ্জ হ্যান্ডলার
 const handleClassChange = async () => {
   form.value.section_id = ''
   filteredSections.value = []
   if (!form.value.class_id) return
 
   try {
+    const token = localStorage.getItem('token')
     const res = await axios.get(
       `http://127.0.0.1:8000/api/academic/classes/${form.value.class_id}/sections`,
+      { headers: { Authorization: `Bearer ${token}` } },
     )
     filteredSections.value = res.data.data
   } catch (error) {
-    console.error('সেকশন লোড সমস্যা', error)
+    console.error('Section load error', error)
   }
   fetchNextNumbers()
 }
 
-// অটো নম্বর জেনারেট
+// ৩. অটো নম্বর জেনারেট
 const fetchNextNumbers = async () => {
   try {
+    const token = localStorage.getItem('token')
     const response = await axios.get('http://127.0.0.1:8000/api/students/next-numbers', {
+      headers: { Authorization: `Bearer ${token}` },
       params: { class_id: form.value.class_id, section_id: form.value.section_id },
     })
     const result = response.data.data
@@ -70,11 +73,11 @@ const fetchNextNumbers = async () => {
       form.value.roll_no = result.next_roll_no || ''
     }
   } catch (error) {
-    console.error('নম্বর জেনারেট সমস্যা:', error)
+    console.error('Number generation error:', error)
   }
 }
 
-// ফাইল হ্যান্ডলিং এবং প্রিভিউ জেনারেট
+// ৪. ফাইল হ্যান্ডলিং
 const handleFileChange = (event) => {
   const file = event.target.files[0]
   if (file) {
@@ -86,14 +89,12 @@ const handleFileChange = (event) => {
   }
 }
 
-// সাবমিট ফাংশন
+// ৫. সাবমিট ফাংশন
 const handleSubmit = async () => {
   isLoading.value = true
   errors.value = {}
 
-  // FormData তৈরি
   const formData = new FormData()
-
   for (const key in form.value) {
     if (form.value[key] !== null && form.value[key] !== undefined && form.value[key] !== '') {
       formData.append(key, form.value[key])
@@ -101,27 +102,33 @@ const handleSubmit = async () => {
   }
 
   try {
+    const token = localStorage.getItem('token')
     await axios.post('http://127.0.0.1:8000/api/students/admit', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: `Bearer ${token}`,
+      },
     })
 
-    // সুইট এলার্ট মেসেজ
     await Swal.fire({
-      title: 'সফল!',
-      text: 'স্টুডেন্ট সফলভাবে ভর্তি হয়েছে! ডিফল্ট পাসওয়ার্ড: 12345678',
+      title: 'Success!',
+      text: 'Student admitted successfully! Default Password: 12345678',
       icon: 'success',
-      confirmButtonText: 'ঠিক আছে',
+      background: '#1e1e2d',
+      color: '#fff',
     })
 
-    router.push('/admin/students')
+    router.push('/students')
   } catch (error) {
     if (error.response && error.response.status === 422) {
       errors.value = error.response.data.errors
     } else {
       Swal.fire({
-        title: 'এরর!',
-        text: error.response?.data?.message || 'সার্ভার এরর',
+        title: 'Error!',
+        text: error.response?.data?.message || 'Server Error',
         icon: 'error',
+        background: '#1e1e2d',
+        color: '#fff',
       })
     }
   } finally {
@@ -136,98 +143,66 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="form-container">
-    <div class="header">
-      <h2>🎓 নতুন স্টুডেন্ট ভর্তি</h2>
-      <button @click="router.back()" class="back-btn">⬅ ফিরে যান</button>
+  <div class="page-container">
+    <div class="header-action">
+      <div>
+        <h2 class="page-title">🎓 Student Admission</h2>
+        <p class="page-subtitle">Fill in the details to admit a new student</p>
+      </div>
+      <button @click="router.back()" class="back-btn">
+        <span class="icon">⬅</span> Back to List
+      </button>
     </div>
 
-    <div class="card">
+    <div class="form-card">
       <form @submit.prevent="handleSubmit">
+        <div class="section-title">📝 Basic Information</div>
         <div class="grid-container">
           <div class="form-group">
-            <label>স্টুডেন্টের নাম</label>
+            <label>Full Name <span class="required">*</span></label>
             <input
               v-model="form.name"
               type="text"
-              placeholder="পুরো নাম"
+              placeholder="Enter student's full name"
               :class="{ 'border-red': errors.name }"
             />
             <span v-if="errors.name" class="error-msg">{{ errors.name[0] }}</span>
           </div>
 
           <div class="form-group">
-            <label>ইমেইল এড্রেস</label>
+            <label>Email Address <span class="required">*</span></label>
             <input
               v-model="form.email"
               type="email"
-              placeholder="email@school.com"
+              placeholder="student@school.com"
               :class="{ 'border-red': errors.email }"
             />
             <span v-if="errors.email" class="error-msg">{{ errors.email[0] }}</span>
           </div>
 
           <div class="form-group">
-            <label>অ্যাডমিশন নং</label>
-            <input v-model="form.admission_no" type="text" readonly />
+            <label>Phone Number</label>
+            <input v-model="form.phone" type="text" placeholder="017xxxxxxxx" />
           </div>
 
           <div class="form-group">
-            <label>ক্লাস</label>
-            <select
-              v-model="form.class_id"
-              @change="handleClassChange"
-              :class="{ 'border-red': errors.class_id }"
-            >
-              <option value="" disabled>সিলেক্ট করুন</option>
-              <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.name }}</option>
-            </select>
-            <span v-if="errors.class_id" class="error-msg">{{ errors.class_id[0] }}</span>
-          </div>
-
-          <div class="form-group">
-            <label>সেকশন</label>
-            <select
-              v-model="form.section_id"
-              @change="fetchNextNumbers"
-              :class="{ 'border-red': errors.section_id }"
-            >
-              <option value="" disabled>সিলেক্ট করুন</option>
-              <option v-for="sec in filteredSections" :key="sec.id" :value="sec.id">
-                {{ sec.name }}
-              </option>
-            </select>
-            <span v-if="errors.section_id" class="error-msg">{{ errors.section_id[0] }}</span>
-          </div>
-
-          <div class="form-group">
-            <label>রোল নং</label>
-            <input v-model="form.roll_no" type="text" readonly />
-          </div>
-
-          <div class="form-group">
-            <label>লিঙ্গ</label>
-            <select v-model="form.gender">
-              <option value="Male">ছেলে</option>
-              <option value="Female">মেয়ে</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>জন্ম তারিখ</label>
+            <label>Date of Birth</label>
             <input v-model="form.dob" type="date" :class="{ 'border-red': errors.dob }" />
             <span v-if="errors.dob" class="error-msg">{{ errors.dob[0] }}</span>
           </div>
 
           <div class="form-group">
-            <label>ফোন নম্বর</label>
-            <input v-model="form.phone" type="text" placeholder="017xxxxxxxx" />
+            <label>Gender</label>
+            <select v-model="form.gender">
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
           </div>
 
           <div class="form-group">
-            <label>রক্তের গ্রুপ</label>
+            <label>Blood Group</label>
             <select v-model="form.blood_group">
-              <option value="">সিলেক্ট করুন</option>
+              <option value="">Select Group</option>
               <option value="A+">A+</option>
               <option value="A-">A-</option>
               <option value="B+">B+</option>
@@ -240,32 +215,80 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="form-group full-width">
-          <label>ঠিকানা</label>
+        <div class="section-title mt-4">🏫 Academic Details</div>
+        <div class="grid-container">
+          <div class="form-group">
+            <label>Admission No (Auto)</label>
+            <input v-model="form.admission_no" type="text" readonly class="readonly-input" />
+          </div>
+
+          <div class="form-group">
+            <label>Class <span class="required">*</span></label>
+            <select
+              v-model="form.class_id"
+              @change="handleClassChange"
+              :class="{ 'border-red': errors.class_id }"
+            >
+              <option value="" disabled>Select Class</option>
+              <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.name }}</option>
+            </select>
+            <span v-if="errors.class_id" class="error-msg">{{ errors.class_id[0] }}</span>
+          </div>
+
+          <div class="form-group">
+            <label>Section <span class="required">*</span></label>
+            <select
+              v-model="form.section_id"
+              @change="fetchNextNumbers"
+              :class="{ 'border-red': errors.section_id }"
+            >
+              <option value="" disabled>Select Section</option>
+              <option v-for="sec in filteredSections" :key="sec.id" :value="sec.id">
+                {{ sec.name }}
+              </option>
+            </select>
+            <span v-if="errors.section_id" class="error-msg">{{ errors.section_id[0] }}</span>
+          </div>
+
+          <div class="form-group">
+            <label>Roll No (Auto)</label>
+            <input v-model="form.roll_no" type="text" readonly class="readonly-input" />
+          </div>
+        </div>
+
+        <div class="section-title mt-4">📍 Address & Photo</div>
+        <div class="full-width">
+          <label>Address</label>
           <textarea
             v-model="form.address"
             rows="3"
-            placeholder="বর্তমান ঠিকানা..."
+            placeholder="Present Address..."
             :class="{ 'border-red': errors.address }"
           ></textarea>
           <span v-if="errors.address" class="error-msg">{{ errors.address[0] }}</span>
         </div>
 
-        <div class="form-group full-width">
-          <label>স্টুডেন্টের ছবি</label>
-          <div class="upload-area">
-            <input type="file" @change="handleFileChange" accept="image/*" class="file-input" />
-            <div v-if="imagePreview" class="preview-box">
-              <p>প্রিভিউ:</p>
-              <img :src="imagePreview" alt="Student Preview" class="preview-img" />
-            </div>
+        <div class="upload-section">
+          <label>Student Photo</label>
+          <div class="upload-box">
+            <input
+              type="file"
+              @change="handleFileChange"
+              accept="image/*"
+              id="file-upload"
+              class="hidden-input"
+            />
+            <label for="file-upload" class="upload-label">
+              <span v-if="!imagePreview" class="upload-icon">📷 Click to Upload</span>
+              <img v-else :src="imagePreview" class="preview-img" />
+            </label>
           </div>
           <span v-if="errors.image" class="error-msg">{{ errors.image[0] }}</span>
         </div>
 
         <div class="form-actions">
           <button type="submit" :disabled="isLoading" class="submit-btn">
-            {{ isLoading ? 'সেভ হচ্ছে...' : '✅ স্টুডেন্ট ভর্তি করুন' }}
+            {{ isLoading ? 'Processing...' : '✅ Admit Student' }}
           </button>
         </div>
       </form>
@@ -274,103 +297,194 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.form-container {
+/* Page Layout */
+.page-container {
+  padding: 25px;
+  color: #fff;
   max-width: 900px;
   margin: 0 auto;
 }
-.header {
+.header-action {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 25px;
 }
-.card {
-  background: white;
-  padding: 2rem;
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+  color: white;
+}
+.page-subtitle {
+  color: #a1a5b7;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+/* Back Button */
+.back-btn {
+  background: #2b2b40;
+  color: #a1a5b7;
+  border: 1px solid #323248;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.3s;
+}
+.back-btn:hover {
+  background: #323248;
+  color: white;
+}
+
+/* Form Card */
+.form-card {
+  background: #1e1e2d;
+  padding: 30px;
   border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #2b2b40;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #3b82f6;
+  border-bottom: 1px solid #2b2b40;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+.mt-4 {
+  margin-top: 25px;
+}
+
+/* Grid & Inputs */
 .grid-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+  gap: 20px;
 }
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
 }
 .full-width {
-  grid-column: span 2;
-  margin-top: 1rem;
+  width: 100%;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
+
 label {
-  font-size: 0.9rem;
+  font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: #a1a5b7;
 }
+.required {
+  color: #ef4444;
+}
+
 input,
 select,
 textarea {
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
+  padding: 12px;
+  background: #151521;
+  border: 1px solid #2b2b40;
   border-radius: 8px;
-  font-size: 0.95rem;
-  width: 100%;
-  box-sizing: border-box;
+  color: white;
+  outline: none;
+  font-size: 14px;
+  transition: 0.3s;
 }
-.error-msg {
-  color: #ef4444;
-  font-size: 0.8rem;
-  margin-top: -2px;
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #3b82f6;
+}
+.readonly-input {
+  background: #2b2b40;
+  color: #7e8299;
+  cursor: not-allowed;
 }
 .border-red {
   border-color: #ef4444 !important;
-  background-color: #fef2f2;
+  background: rgba(239, 68, 68, 0.1);
 }
-.submit-btn {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: white;
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
+.error-msg {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 2px;
 }
-.submit-btn:disabled {
-  background: #94a3b8;
-}
-.back-btn {
-  background: #64748b;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.upload-area {
-  border: 2px dashed #d1d5db;
-  padding: 20px;
-  border-radius: 8px;
-  text-align: center;
-}
-.file-input {
-  border: none;
-  padding: 10px;
-}
-.preview-box {
+
+/* Upload Section */
+.upload-section {
   margin-top: 15px;
 }
-.preview-box p {
-  font-size: 0.9rem;
-  color: #6b7280;
-  margin-bottom: 5px;
-}
-.preview-img {
+.upload-box {
   width: 120px;
   height: 120px;
+  border: 2px dashed #2b2b40;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  background: #151521;
+  transition: 0.3s;
+  overflow: hidden;
+}
+.upload-box:hover {
+  border-color: #3b82f6;
+}
+.hidden-input {
+  display: none;
+}
+.upload-label {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+}
+.upload-icon {
+  font-size: 12px;
+  color: #a1a5b7;
+  text-align: center;
+}
+.preview-img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+}
+
+/* Submit Button */
+.form-actions {
+  margin-top: 30px;
+  display: flex;
+  justify-content: flex-end;
+}
+.submit-btn {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  padding: 12px 30px;
+  border: none;
   border-radius: 8px;
-  border: 3px solid #e5e7eb;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 15px;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+  transition: 0.3s;
+}
+.submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+}
+.submit-btn:disabled {
+  background: #2b2b40;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 </style>

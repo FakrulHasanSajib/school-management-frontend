@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import Swal from 'sweetalert2' // সুন্দর এলার্টের জন্য (অপশনাল)
 
 const email = ref('')
 const password = ref('')
@@ -16,24 +15,25 @@ const handleLogin = async () => {
   errorMessage.value = ''
 
   try {
-    // ১. লগইন অ্যাকশন কল করা
+    // ১. লগইন রিকোয়েস্ট
     await authStore.login(email.value, password.value)
 
     // ২. রোল চেক করা
     const role = localStorage.getItem('user_role') || authStore.user?.role
 
-    console.log('User Role Found:', role) // কনসোলে চেক করার জন্য
+    console.log('Logged in as:', role) // কনসোলে রোল চেক করার জন্য
 
-    // ৩. ✅ রোল অনুযায়ী সঠিক রিডাইরেক্ট (লজিক ফিক্সড)
+    // ৩. রোল অনুযায়ী রিডাইরেক্ট লজিক (আপডেট করা হয়েছে)
     if (role === 'student') {
       router.push('/student/dashboard')
     } else if (role === 'teacher') {
-      router.push('/teacher/dashboard') // 👈 টিচার এখন এখানে যাবে
-    } else if (role === 'admin') {
+      router.push('/teacher/dashboard')
+    }
+    // ✅ ফিক্স: 'admin', 'superadmin' অথবা 'super-admin' হলে অ্যাডমিন প্যানেলে যাবে
+    else if (['admin', 'superadmin', 'super-admin'].includes(role)) {
       router.push('/admin/dashboard')
     } else {
-      // যদি রোল না মেলে
-      errorMessage.value = 'Unknown User Role'
+      errorMessage.value = 'Unknown User Role: ' + role
     }
   } catch (error) {
     console.error(error)

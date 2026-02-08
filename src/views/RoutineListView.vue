@@ -6,41 +6,29 @@ import Swal from 'sweetalert2'
 
 const router = useRouter()
 const routines = ref([])
-const isLoading = ref(false)
+const isLoading = ref(true)
 
-// ফিল্টার ভেরিয়েবল
+// ফিল্টার ভেরিয়েবল
 const classes = ref([])
 const sections = ref([])
 const selectedClass = ref('')
 const selectedSection = ref('')
 
-// স্কুলের তথ্য
-const schoolName = 'সফ্টওয়্যার আইটি স্কুল এন্ড কলেজ'
-const schoolAddress = 'মিরপুর-১০, ঢাকা-১২১৬'
+// স্কুলের তথ্য (প্রিন্টের জন্য)
+const schoolName = 'Software IT School & College'
+const schoolAddress = 'Mirpur-10, Dhaka-1216'
 const schoolLogo = 'https://cdn-icons-png.flaticon.com/512/2965/2965300.png'
 
-const Toast = Swal.mixin({
-  toast: true,
-  position: 'top-end',
-  showConfirmButton: false,
-  timer: 3000,
-  timerProgressBar: true,
-  didOpen: (toast) => {
-    toast.addEventListener('mouseenter', Swal.stopTimer)
-    toast.addEventListener('mouseleave', Swal.resumeTimer)
-  },
-})
-
-// প্রিন্টের সময় ক্লাসের নাম দেখানোর জন্য
+// প্রিন্টের সময় ক্লাসের নাম দেখানোর জন্য
 const getSelectedClassName = computed(() => {
   const cls = classes.value.find((c) => c.id === selectedClass.value)
-  return cls ? cls.name : 'সকল ক্লাস'
+  return cls ? cls.name : 'All Classes'
 })
 
-// প্রিন্টের সময় সেকশনের নাম দেখানোর জন্য
+// প্রিন্টের সময় সেকশনের নাম দেখানোর জন্য
 const getSelectedSectionName = computed(() => {
   const sec = sections.value.find((s) => s.id === selectedSection.value)
-  return sec ? sec.name : 'সকল সেকশন'
+  return sec ? sec.name : 'All Sections'
 })
 
 // ডাটা লোড
@@ -74,7 +62,13 @@ const fetchRoutines = async () => {
     routines.value = response.data.data
   } catch (error) {
     console.error('Error:', error)
-    Toast.fire({ icon: 'error', title: 'ডাটা লোড হয়নি' })
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Failed to load routines',
+      background: '#1e1e2d',
+      color: '#fff',
+    })
   } finally {
     isLoading.value = false
   }
@@ -82,13 +76,17 @@ const fetchRoutines = async () => {
 
 const deleteRoutine = async (id) => {
   const result = await Swal.fire({
-    title: 'নিশ্চিত?',
-    text: 'ডিলিট করলে ফেরত পাবেন না!',
+    title: 'Are you sure?',
+    text: "You won't be able to revert this!",
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonText: 'হ্যাঁ',
-    cancelButtonText: 'না',
+    background: '#1e1e2d',
+    color: '#fff',
+    confirmButtonColor: '#ef4444',
+    cancelButtonColor: '#6b7280',
+    confirmButtonText: 'Yes, delete it!',
   })
+
   if (result.isConfirmed) {
     try {
       const token = localStorage.getItem('token')
@@ -96,9 +94,21 @@ const deleteRoutine = async (id) => {
         headers: { Authorization: `Bearer ${token}` },
       })
       routines.value = routines.value.filter((r) => r.id !== id)
-      Toast.fire({ icon: 'success', title: 'ডিলিট হয়েছে!' })
+      Swal.fire({
+        icon: 'success',
+        title: 'Deleted!',
+        text: 'Routine has been deleted.',
+        background: '#1e1e2d',
+        color: '#fff',
+      })
     } catch (e) {
-      Toast.fire({ icon: 'error', title: 'সমস্যা হয়েছে!' })
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to delete routine.',
+        background: '#1e1e2d',
+        color: '#fff',
+      })
     }
   }
 }
@@ -114,64 +124,75 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="main-wrapper">
-    <div class="list-container" id="print-area">
-      <div class="print-header">
-        <div class="logo-area">
-          <img :src="schoolLogo" alt="Logo" class="school-logo" />
-        </div>
-        <div class="school-info">
-          <h1 class="school-name">{{ schoolName }}</h1>
-          <p class="school-address">{{ schoolAddress }}</p>
-          <div class="routine-meta">
-            <span class="meta-badge">ক্লাস: {{ getSelectedClassName }}</span>
-            <span class="meta-badge">সেকশন: {{ getSelectedSectionName }}</span>
-            <span class="meta-badge">সাল: ২০২৬</span>
-          </div>
+  <div class="page-container">
+    <div class="print-header">
+      <img :src="schoolLogo" alt="Logo" class="print-logo" />
+      <div class="print-info">
+        <h1>{{ schoolName }}</h1>
+        <p>{{ schoolAddress }}</p>
+        <div class="print-meta">
+          <span>Class: {{ getSelectedClassName }}</span>
+          <span>Section: {{ getSelectedSectionName }}</span>
+          <span>Year: 2026</span>
         </div>
       </div>
+    </div>
 
-      <div class="header-action no-print">
-        <h2>📅 ক্লাস রুটিন তালিকা</h2>
-        <div class="header-buttons">
-          <button @click="printRoutine" class="print-btn">🖨️ প্রিন্ট / PDF</button>
-          <button @click="router.push('/admin/routines/create')" class="add-btn">
-            + নতুন রুটিন
-          </button>
-        </div>
+    <div class="header-action no-print">
+      <div>
+        <h2 class="page-title">📅 Class Routine</h2>
+        <p class="page-subtitle">Manage class schedules & timings</p>
       </div>
-
-      <div class="filter-card no-print">
-        <div class="filter-group">
-          <label>ক্লাস:</label>
-          <select v-model="selectedClass" @change="fetchRoutines">
-            <option value="">সকল ক্লাস</option>
-            <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.name }}</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>সেকশন:</label>
-          <select v-model="selectedSection" @change="fetchRoutines">
-            <option value="">সকল সেকশন</option>
-            <option v-for="sec in sections" :key="sec.id" :value="sec.id">{{ sec.name }}</option>
-          </select>
-        </div>
-        <button @click="fetchRoutines" class="refresh-btn">🔄 রিফ্রেশ</button>
+      <div class="header-buttons">
+        <button @click="printRoutine" class="btn print-btn">🖨️ Print / PDF</button>
+        <button @click="router.push('/admin/routines/create')" class="btn add-btn">
+          ➕ New Routine
+        </button>
       </div>
+    </div>
 
-      <div v-if="isLoading" class="loading">লোড হচ্ছে...</div>
+    <div class="filter-card no-print">
+      <div class="filter-group">
+        <label>Filter by Class:</label>
+        <select v-model="selectedClass" @change="fetchRoutines">
+          <option value="">All Classes</option>
+          <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.name }}</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Filter by Section:</label>
+        <select v-model="selectedSection" @change="fetchRoutines">
+          <option value="">All Sections</option>
+          <option v-for="sec in sections" :key="sec.id" :value="sec.id">{{ sec.name }}</option>
+        </select>
+      </div>
+      <button @click="fetchRoutines" class="btn refresh-btn">🔄 Refresh</button>
+    </div>
 
-      <div v-else class="table-responsive">
-        <table class="routine-table">
+    <div v-if="isLoading" class="loading-state no-print">
+      <div class="spinner"></div>
+      <p>Loading routines...</p>
+    </div>
+
+    <div v-else-if="routines.length === 0" class="empty-state no-print">
+      <div class="empty-content">
+        <span class="empty-icon">📂</span>
+        <p>No routines found.</p>
+      </div>
+    </div>
+
+    <div v-else class="table-card">
+      <div class="table-responsive">
+        <table class="custom-table">
           <thead>
             <tr>
-              <th>দিন</th>
-              <th>সময়</th>
-              <th>ক্লাস</th>
-              <th>সেকশন</th>
-              <th>বিষয়</th>
-              <th>শিক্ষক</th>
-              <th class="no-print">অ্যাকশন</th>
+              <th>Day</th>
+              <th>Time</th>
+              <th>Class</th>
+              <th>Section</th>
+              <th>Subject</th>
+              <th>Teacher</th>
+              <th class="no-print">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -179,22 +200,26 @@ onMounted(async () => {
               <td>
                 <span class="day-badge">{{ routine.day }}</span>
               </td>
-              <td class="text-dark">{{ routine.start_time }} - {{ routine.end_time }}</td>
-              <td class="text-dark">{{ routine.school_class?.name || 'N/A' }}</td>
-              <td class="text-dark">{{ routine.section?.name || 'N/A' }}</td>
-              <td class="text-dark">{{ routine.subject?.name || 'N/A' }}</td>
-              <td>
-                <div class="teacher-info text-dark">{{ routine.teacher?.name || 'N/A' }}</div>
+              <td class="time-col">{{ routine.start_time }} - {{ routine.end_time }}</td>
+              <td>{{ routine.school_class?.name || 'N/A' }}</td>
+              <td>{{ routine.section?.name || 'N/A' }}</td>
+              <td>{{ routine.subject?.name || 'N/A' }}</td>
+              <td>{{ routine.teacher?.name || 'N/A' }}</td>
+
+              <td class="no-print">
+                <div class="action-buttons">
+                  <button
+                    @click="router.push(`/admin/routines/edit/${routine.id}`)"
+                    class="btn-icon edit"
+                    title="Edit"
+                  >
+                    ✏️
+                  </button>
+                  <button @click="deleteRoutine(routine.id)" class="btn-icon delete" title="Delete">
+                    🗑️
+                  </button>
+                </div>
               </td>
-              <td class="no-print" style="display: flex; gap: 5px">
-                <button @click="router.push(`/admin/routines/edit/${routine.id}`)" class="edit-btn">
-                  Edit
-                </button>
-                <button @click="deleteRoutine(routine.id)" class="delete-btn">Delete</button>
-              </td>
-            </tr>
-            <tr v-if="routines.length === 0">
-              <td colspan="7" class="text-center">কোনো রুটিন পাওয়া যায়নি</td>
             </tr>
           </tbody>
         </table>
@@ -204,184 +229,303 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.list-container {
-  padding: 20px;
-  font-family: 'Segoe UI', sans-serif;
-  background: white;
-  border-radius: 8px;
+/* Page Layout */
+.page-container {
+  padding: 25px;
+  color: #fff;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 .header-action {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+  color: white;
+}
+.page-subtitle {
+  color: #a1a5b7;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+/* Buttons */
 .header-buttons {
   display: flex;
   gap: 10px;
 }
-.filter-card {
-  background: #f8fafc;
-  padding: 15px;
+.btn {
+  padding: 10px 20px;
   border-radius: 8px;
-  margin-bottom: 20px;
-  display: flex;
-  gap: 20px;
-  align-items: center;
-  border: 1px solid #e2e8f0;
-}
-.routine-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.routine-table th,
-.routine-table td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #e2e8f0;
-  color: #334155;
-}
-.routine-table th {
-  background: #f1f5f9;
+  border: none;
+  cursor: pointer;
   font-weight: 600;
-}
-.day-badge {
-  background: #e0f2fe;
-  color: #0369a1;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 14px;
+  transition: 0.3s;
 }
 .add-btn {
-  background: #2563eb;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-}
-.print-btn {
-  background: #059669;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-}
-.refresh-btn {
-  background: #64748b;
-  color: white;
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-}
-.edit-btn {
   background: #3b82f6;
   color: white;
-  border: none;
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-right: 5px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
-.delete-btn {
+.add-btn:hover {
+  transform: translateY(-2px);
+}
+.print-btn {
+  background: #10b981;
+  color: white;
+}
+.print-btn:hover {
+  background: #059669;
+}
+.refresh-btn {
+  background: #2b2b40;
+  color: #a1a5b7;
+  padding: 10px 15px;
+}
+.refresh-btn:hover {
+  background: #323248;
+  color: white;
+}
+
+/* Filter Card */
+.filter-card {
+  background: #1e1e2d;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 25px;
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  border: 1px solid #2b2b40;
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.filter-group label {
+  color: #a1a5b7;
+  font-size: 13px;
+  font-weight: 600;
+}
+.filter-group select {
+  padding: 10px 15px;
+  background: #151521;
+  border: 1px solid #2b2b40;
+  border-radius: 8px;
+  color: white;
+  outline: none;
+  min-width: 200px;
+  cursor: pointer;
+}
+
+/* Table Card */
+.table-card {
+  background: #1e1e2d;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #2b2b40;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+.custom-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.custom-table th {
+  background: #151521;
+  padding: 18px;
+  color: #a1a5b7;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #2b2b40;
+}
+.custom-table td {
+  padding: 16px 18px;
+  border-bottom: 1px solid #2b2b40;
+  color: #e2e8f0;
+  vertical-align: middle;
+  font-size: 14px;
+}
+.custom-table tr:last-child td {
+  border-bottom: none;
+}
+.custom-table tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Badges & Styles */
+.day-badge {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.time-col {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #a1a5b7;
+}
+
+/* Actions */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.3s;
+  font-size: 14px;
+}
+.edit {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+.edit:hover {
+  background: #3b82f6;
+  color: white;
+}
+.delete {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+.delete:hover {
   background: #ef4444;
   color: white;
-  border: none;
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
 }
 
-/* প্রিন্ট হেডার স্টাইল (শুরুতে লুকানো থাকবে) */
+/* Loading & Empty */
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 50px;
+  color: #a1a5b7;
+}
+.spinner {
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.empty-icon {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 10px;
+  opacity: 0.5;
+}
+
+/* Print Styles */
 .print-header {
   display: none;
-  text-align: center;
-  margin-bottom: 30px;
-  border-bottom: 2px solid #333;
-  padding-bottom: 20px;
 }
-.school-logo {
-  width: 80px;
-  height: auto;
-  margin-bottom: 10px;
-}
-.school-name {
-  font-size: 24px;
-  font-weight: bold;
-  margin: 5px 0;
-  color: #000;
-}
-.school-address {
-  font-size: 14px;
-  color: #555;
-  margin-bottom: 15px;
-}
-.routine-meta {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-top: 10px;
-}
-.meta-badge {
-  border: 1px solid #000;
-  padding: 5px 15px;
-  border-radius: 20px;
-  font-weight: bold;
-  font-size: 14px;
-  background: #f0f0f0;
-}
-</style>
 
-<style>
 @media print {
-  /* বডির সব কিছু লুকিয়ে ফেলা (সাইডবার সহ) */
   body * {
     visibility: hidden;
   }
-
-  /* শুধু আমাদের প্রিন্ট এরিয়া দৃশ্যমান করা */
-  #print-area,
-  #print-area * {
-    visibility: visible;
-  }
-
-  /* প্রিন্ট এরিয়াকে একদম উপরে বামে ফিক্স করা */
-  #print-area {
-    position: fixed;
+  .page-container {
+    position: absolute;
     left: 0;
     top: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
     margin: 0;
-    padding: 20px;
+    padding: 0;
     background: white;
-    z-index: 99999;
+    color: black;
+  }
+  .table-card,
+  .table-card * {
+    visibility: visible;
+  }
+  .table-card {
+    position: absolute;
+    top: 180px;
+    left: 0;
+    width: 100%;
+    box-shadow: none;
+    border: none;
+  }
+  .print-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    visibility: visible;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 20px;
+    border-bottom: 2px solid #333;
+  }
+  .print-header * {
+    visibility: visible;
+  }
+  .print-logo {
+    width: 60px;
+    margin-bottom: 10px;
+  }
+  .print-info {
+    text-align: center;
+    color: black;
+  }
+  .print-info h1 {
+    font-size: 24px;
+    margin: 0;
+  }
+  .print-meta {
+    margin-top: 10px;
+    font-weight: bold;
+    display: flex;
+    gap: 15px;
+    font-size: 14px;
   }
 
-  /* বাটন লুকানো */
   .no-print {
     display: none !important;
   }
 
-  /* প্রিন্ট হেডার দেখানো */
-  .print-header {
-    display: block !important;
-  }
-
-  /* টেবিল বর্ডার সুন্দর করা */
-  .routine-table th,
-  .routine-table td {
+  /* Table Print Reset */
+  .custom-table th {
+    background: #eee !important;
+    color: black !important;
     border: 1px solid #000 !important;
-    color: #000 !important;
+  }
+  .custom-table td {
+    color: black !important;
+    border: 1px solid #000 !important;
   }
   .day-badge {
     background: none !important;
-    border: none !important;
     color: black !important;
-    font-weight: bold;
+    border: 1px solid #000;
+  }
+  .time-col {
+    color: black !important;
   }
 }
 </style>

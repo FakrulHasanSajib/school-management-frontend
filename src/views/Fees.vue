@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 
-// ✅ সার্ভার কনফিগারেশন (লোকালহোস্টের সমস্যা এড়াতে হার্ডকোড রাখা ভালো)
+// সার্ভার কনফিগারেশন
 const BASE_URL = 'http://127.0.0.1:8000/api'
 const token = localStorage.getItem('token')
 const apiConfig = { headers: { Authorization: `Bearer ${token}` } }
@@ -25,13 +25,13 @@ const newFeeType = ref({ name: '', amount: '', due_date: '' })
 const isEditing = ref(false)
 const editId = ref(null)
 
-// ✅ Invoice Form (Amount যুক্ত করা হয়েছে)
+// Invoice Form
 const invoiceForm = ref({
   class_id: '',
   section_id: '',
   student_id: '',
   fee_type_id: '',
-  amount: '', // 🔴 Fixed: Amount field added
+  amount: '',
   due_date: new Date().toISOString().substr(0, 10),
 })
 
@@ -124,9 +124,7 @@ const deleteFeeType = async (id) => {
   }
 }
 
-// --- ৩. জেনারেট ইনভয়েস (FIXED) ---
-
-// ✅ ফি টাইপ সিলেক্ট করলে অটোমেটিক টাকা বসবে
+// --- ৩. জেনারেট ইনভয়েস ---
 const onInvoiceFeeTypeChange = () => {
   const selected = feeTypes.value.find((ft) => ft.id == invoiceForm.value.fee_type_id)
   if (selected) {
@@ -137,7 +135,6 @@ const onInvoiceFeeTypeChange = () => {
 }
 
 const generateInvoice = async () => {
-  // ভ্যালিডেশন
   if (!invoiceForm.value.student_id || !invoiceForm.value.fee_type_id) {
     Swal.fire('Warning', 'Please select Student and Fee Type', 'warning')
     return
@@ -148,18 +145,12 @@ const generateInvoice = async () => {
   }
 
   try {
-    console.log('Sending Invoice Data:', invoiceForm.value)
-
     await axios.post(`${BASE_URL}/accounts/invoices`, invoiceForm.value, apiConfig)
-
     Swal.fire('Success', 'Invoice generated successfully!', 'success')
-
-    // ফর্ম রিসেট (ক্লাস/সেকশন বাদে)
     invoiceForm.value.fee_type_id = ''
     invoiceForm.value.amount = ''
     invoiceForm.value.student_id = ''
   } catch (e) {
-    console.error(e)
     let msg = 'Failed to generate invoice'
     if (e.response && e.response.data && e.response.data.message) {
       msg = e.response.data.message
@@ -178,7 +169,6 @@ const getDues = async () => {
     )
     studentInvoices.value = res.data.data || res.data
   } catch (e) {
-    console.error(e)
     Swal.fire('Error', 'Could not load dues', 'error')
   }
 }
@@ -216,7 +206,7 @@ const collectPayment = async () => {
         apiConfig,
       )
       Swal.fire('Paid!', 'Payment collected successfully.', 'success')
-      getDues() // রিফ্রেশ
+      getDues()
     } catch (e) {
       let msg = 'Payment failed'
       if (e.response && e.response.data.message) msg = e.response.data.message
@@ -228,7 +218,6 @@ const collectPayment = async () => {
 // --- ৫. হিস্ট্রি ---
 const loadHistory = async () => {
   try {
-    // এখন GET মেথডে ইনভয়েস লিস্ট আসবে
     const res = await axios.get(`${BASE_URL}/accounts/invoices`, apiConfig)
     allInvoices.value = res.data.data || res.data
   } catch (e) {
@@ -252,26 +241,28 @@ onMounted(loadInitialData)
 </script>
 
 <template>
-  <div class="p-4">
-    <div class="card mb-4 no-print">
+  <div class="page-container">
+    <div class="glass-card mb-4 no-print">
       <div class="tabs">
         <button :class="{ active: activeTab === 'setup' }" @click="activeTab = 'setup'">
-          ⚙️ Fee Setup
+          ⚙️ Setup
         </button>
         <button :class="{ active: activeTab === 'invoice' }" @click="activeTab = 'invoice'">
-          📄 Generate Bill
+          📄 Invoice
         </button>
         <button :class="{ active: activeTab === 'collection' }" @click="activeTab = 'collection'">
-          💰 Collect Fee
+          💰 Collection
         </button>
         <button :class="{ active: activeTab === 'history' }" @click="goToHistory">
-          📜 History & Reports
+          📜 History
         </button>
       </div>
     </div>
 
-    <div v-if="activeTab === 'setup'" class="card no-print">
-      <h3>{{ isEditing ? 'Edit Fee Type' : 'Add New Fee Type' }}</h3>
+    <div v-if="activeTab === 'setup'" class="glass-card no-print">
+      <div class="card-header">
+        <h3>{{ isEditing ? '✏️ Edit Fee Type' : '➕ Add New Fee Type' }}</h3>
+      </div>
 
       <div class="form-grid">
         <div class="form-group">
@@ -287,50 +278,45 @@ onMounted(loadInitialData)
           <input v-model="newFeeType.due_date" type="date" />
         </div>
 
-        <div
-          class="form-group button-group"
-          style="display: flex; align-items: flex-end; gap: 10px"
-        >
-          <button
-            @click="saveFeeType"
-            :class="isEditing ? 'btn-update' : 'btn-save'"
-            style="flex: 1"
-          >
+        <div class="form-actions">
+          <button v-if="isEditing" @click="cancelEdit" class="btn cancel-btn">Cancel</button>
+          <button @click="saveFeeType" class="btn save-btn">
             {{ isEditing ? 'Update Fee' : 'Save Fee' }}
-          </button>
-          <button v-if="isEditing" @click="cancelEdit" class="btn-cancel" style="flex: 1">
-            Cancel
           </button>
         </div>
       </div>
 
-      <table class="table mt-4">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Amount</th>
-            <th>Due Date</th>
-            <th class="text-center">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="ft in feeTypes" :key="ft.id">
-            <td>{{ ft.name }}</td>
-            <td>{{ ft.amount }}</td>
-            <td>{{ ft.due_date || 'N/A' }}</td>
-            <td class="text-center">
-              <button @click="editFeeType(ft)" class="btn-icon btn-edit" title="Edit">✏️</button>
-              <button @click="deleteFeeType(ft.id)" class="btn-icon btn-delete" title="Delete">
-                🗑️
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-responsive mt-4">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Amount</th>
+              <th>Due Date</th>
+              <th class="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="ft in feeTypes" :key="ft.id">
+              <td>{{ ft.name }}</td>
+              <td>{{ ft.amount }}</td>
+              <td>{{ ft.due_date || 'N/A' }}</td>
+              <td class="text-center">
+                <button @click="editFeeType(ft)" class="btn-icon edit" title="Edit">✏️</button>
+                <button @click="deleteFeeType(ft.id)" class="btn-icon delete" title="Delete">
+                  🗑️
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div v-if="activeTab === 'invoice'" class="card no-print">
-      <h3>Generate Invoice (Single Student)</h3>
+    <div v-if="activeTab === 'invoice'" class="glass-card no-print">
+      <div class="card-header">
+        <h3>📄 Generate Invoice</h3>
+      </div>
       <div class="form-grid">
         <div class="form-group">
           <label>Class</label>
@@ -376,71 +362,81 @@ onMounted(loadInitialData)
           <input v-model="invoiceForm.due_date" type="date" />
         </div>
       </div>
-      <div style="margin-top: 20px">
-        <button @click="generateInvoice" class="btn-save" style="width: 100%">
-          🚀 Generate Bill
-        </button>
+      <div class="mt-4">
+        <button @click="generateInvoice" class="btn save-btn full-width">🚀 Generate Bill</button>
       </div>
     </div>
 
-    <div v-if="activeTab === 'collection'" class="card no-print">
-      <h3>Collect Fees</h3>
+    <div v-if="activeTab === 'collection'" class="glass-card no-print">
+      <div class="card-header">
+        <h3>💰 Collect Fees</h3>
+      </div>
       <div class="filters">
         <select
           v-model="collectionFilter.class_id"
           @change="loadSections(collectionFilter.class_id)"
         >
-          <option value="">Class</option>
+          <option value="">Select Class</option>
           <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
         </select>
         <select
           v-model="collectionFilter.section_id"
           @change="loadStudents(collectionFilter.section_id)"
         >
-          <option value="">Section</option>
+          <option value="">Select Section</option>
           <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
         </select>
         <select v-model="collectionFilter.student_id">
-          <option value="">Student</option>
+          <option value="">Select Student</option>
           <option v-for="st in students" :key="st.id" :value="st.id">{{ st.name }}</option>
         </select>
-        <button @click="getDues" class="btn-search">Search</button>
+        <button @click="getDues" class="btn search-btn">Search</button>
       </div>
 
-      <table class="table mt-4" v-if="studentInvoices.length">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Due Date</th>
-            <th>Total</th>
-            <th>Paid</th>
-            <th>Due</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="inv in studentInvoices" :key="inv.id">
-            <td>{{ inv.fee_type?.name }}</td>
-            <td>{{ inv.due_date }}</td>
-            <td>{{ inv.total_amount }}</td>
-            <td class="text-green">{{ inv.paid_amount }}</td>
-            <td class="text-red">{{ inv.due_amount }}</td>
-            <td>{{ inv.status }}</td>
-            <td>
-              <button v-if="inv.status !== 'Paid'" @click="openPaymentModal(inv)" class="btn-pay">
-                💳 Pay
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-responsive mt-4" v-if="studentInvoices.length">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Due Date</th>
+              <th>Total</th>
+              <th>Paid</th>
+              <th>Due</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="inv in studentInvoices" :key="inv.id">
+              <td>{{ inv.fee_type?.name }}</td>
+              <td>{{ inv.due_date }}</td>
+              <td>{{ inv.total_amount }}</td>
+              <td class="text-green">{{ inv.paid_amount }}</td>
+              <td class="text-red">{{ inv.due_amount }}</td>
+              <td>
+                <span class="badge">{{ inv.status }}</span>
+              </td>
+              <td>
+                <button
+                  v-if="inv.status !== 'Paid'"
+                  @click="openPaymentModal(inv)"
+                  class="btn pay-btn"
+                >
+                  💳 Pay
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div v-if="activeTab === 'history'" class="card no-print">
-      <h3>📜 Payment History</h3>
+    <div v-if="activeTab === 'history'" class="glass-card no-print">
+      <div class="card-header">
+        <h3>📜 Payment History</h3>
+      </div>
       <div class="table-responsive">
-        <table class="table table-bordered">
+        <table class="custom-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -468,9 +464,9 @@ onMounted(loadInitialData)
                 <button
                   v-if="inv.status === 'Paid' || inv.status === 'Partial'"
                   @click="printReceipt(inv)"
-                  class="btn-print"
+                  class="btn-icon print"
                 >
-                  🖨️ Receipt
+                  🖨️
                 </button>
               </td>
             </tr>
@@ -496,7 +492,7 @@ onMounted(loadInitialData)
         </div>
         <hr />
         <p><strong>Student Name:</strong> {{ selectedReceipt.student?.user?.name }}</p>
-        <p><strong>Student ID / Roll:</strong> {{ selectedReceipt.student?.roll_no }}</p>
+        <p><strong>Roll No:</strong> {{ selectedReceipt.student?.roll_no }}</p>
         <p><strong>Class:</strong> {{ selectedReceipt.student?.school_class?.name || 'N/A' }}</p>
         <hr />
         <table class="receipt-table">
@@ -524,9 +520,7 @@ onMounted(loadInitialData)
           </tbody>
         </table>
         <div class="payment-info mt-2">
-          <p>
-            <strong>Payment Method:</strong> {{ selectedReceipt.payments?.[0]?.method || 'Cash' }}
-          </p>
+          <p><strong>Method:</strong> {{ selectedReceipt.payments?.[0]?.method || 'Cash' }}</p>
         </div>
       </div>
       <div class="receipt-footer">
@@ -540,212 +534,293 @@ onMounted(loadInitialData)
 </template>
 
 <style scoped>
-/* Common Card Styles */
-.card {
-  background: white !important;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  color: #333 !important;
+/* Page Layout */
+.page-container {
+  padding: 25px;
+  color: #fff;
+  max-width: 1200px;
+  margin: 0 auto;
 }
+
+/* Glass Card */
+.glass-card {
+  background: #1e1e2d;
+  border-radius: 12px;
+  padding: 25px;
+  border: 1px solid #2b2b40;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  margin-bottom: 20px;
+}
+.card-header h3 {
+  margin: 0 0 20px 0;
+  color: #3b82f6;
+  border-bottom: 1px solid #2b2b40;
+  padding-bottom: 10px;
+}
+
+/* Tabs */
 .tabs {
   display: flex;
   gap: 10px;
-  margin-bottom: 0;
   flex-wrap: wrap;
 }
 .tabs button {
   padding: 10px 20px;
   border: none;
-  background: #e0e0e0;
+  background: #2b2b40;
   cursor: pointer;
-  border-radius: 5px;
-  font-weight: bold;
-  color: #333;
+  border-radius: 8px;
+  font-weight: 600;
+  color: #a1a5b7;
+  transition: 0.3s;
 }
 .tabs button.active {
-  background: #2563eb;
+  background: #3b82f6;
+  color: white;
+}
+.tabs button:hover {
+  background: #323248;
   color: white;
 }
 
-/* Form Styles */
+/* Form Grid */
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 15px;
-  margin-top: 15px;
-  align-items: flex-start;
+  align-items: end;
 }
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 8px;
 }
-.form-group label {
-  font-size: 14px;
-  font-weight: bold;
-  color: #555;
+label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #a1a5b7;
 }
 input,
 select {
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
   width: 100%;
-  background: #fff !important;
-  color: #000 !important;
+  background: #151521;
+  border: 1px solid #2b2b40;
+  padding: 12px;
+  border-radius: 8px;
+  color: white;
+  outline: none;
+  transition: 0.3s;
+}
+input:focus,
+select:focus {
+  border-color: #3b82f6;
 }
 
 /* Buttons */
-.btn-save {
-  background: #2563eb !important;
-  color: white !important;
-  padding: 10px;
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
   border: none;
-  border-radius: 5px;
+  font-weight: 600;
   cursor: pointer;
+  transition: 0.3s;
 }
-.btn-update {
-  background: #d97706 !important;
-  color: white !important;
-  padding: 10px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
+.save-btn {
+  background: #3b82f6;
+  color: white;
 }
-.btn-cancel {
-  background: #6b7280 !important;
-  color: white !important;
-  padding: 10px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
+.save-btn:hover {
+  background: #2563eb;
 }
-.btn-search,
-.btn-print {
-  background: #333 !important;
-  color: white !important;
-  padding: 5px 15px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
+.cancel-btn {
+  background: #2b2b40;
+  color: #a1a5b7;
 }
-.btn-pay {
-  background: #16a34a !important;
-  color: white !important;
-  padding: 5px 10px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
+.cancel-btn:hover {
+  background: #323248;
+  color: white;
+}
+.search-btn {
+  background: #10b981;
+  color: white;
+}
+.search-btn:hover {
+  background: #059669;
+}
+.pay-btn {
+  background: #f59e0b;
+  color: white;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.full-width {
+  width: 100%;
 }
 
-/* Action Buttons */
-.btn-icon {
-  border: none;
-  background: none;
-  font-size: 18px;
-  cursor: pointer;
-  margin: 0 5px;
-  transition: transform 0.2s;
-}
-.btn-icon:hover {
-  transform: scale(1.2);
-}
-.btn-edit {
-  color: #d97706;
-}
-.btn-delete {
-  color: #dc2626;
+/* Filters */
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* Table */
-.table {
+.table-responsive {
+  overflow-x: auto;
+}
+.custom-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 15px;
-  background: #fff !important;
-}
-.table th,
-.table td {
-  padding: 10px;
-  border: 1px solid #eee;
   text-align: left;
-  color: #000 !important;
 }
-.table th {
-  background: #f8fafc !important;
-  font-weight: bold;
+.custom-table th {
+  background: #151521;
+  padding: 15px;
+  color: #a1a5b7;
+  font-weight: 600;
+  font-size: 13px;
+  border-bottom: 1px solid #2b2b40;
+}
+.custom-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #2b2b40;
+  color: #e2e8f0;
 }
 .text-center {
-  text-align: center !important;
-}
-
-/* Status Colors */
-.text-red {
-  color: red !important;
+  text-align: center;
 }
 .text-green {
-  color: green !important;
+  color: #10b981;
+  font-weight: bold;
+}
+.text-red {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+/* Badges */
+.badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
 }
 .bg-green {
-  background: #dcfce7;
-  color: #166534;
-  padding: 2px 6px;
-  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
 }
 .bg-red {
-  background: #fee2e2;
-  color: #991b1b;
-  padding: 2px 6px;
-  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* Action Icons */
+.btn-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 2px;
+}
+.edit {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+.delete {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+.print {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
 }
 
 /* Print Styles */
-@media screen {
-  .print-only {
-    display: none;
-  }
+.print-only {
+  display: none;
 }
+
 @media print {
   body * {
     visibility: hidden;
   }
+  .no-print {
+    display: none !important;
+  }
+
   .print-only,
   .print-only * {
     visibility: visible;
   }
-  .no-print {
-    display: none !important;
-  }
   .print-only {
-    display: block !important;
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
-    padding: 20px;
-    border: 1px solid #000;
+    padding: 40px;
+    background: white !important;
+    color: black !important;
+    display: block !important;
   }
+
   .receipt-header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 30px;
+    border-bottom: 2px solid black;
+    padding-bottom: 10px;
   }
+  .receipt-header h2 {
+    font-size: 24px;
+    margin: 0;
+  }
+  .receipt-header p {
+    margin: 5px 0;
+    font-size: 14px;
+  }
+  .receipt-header h3 {
+    margin-top: 10px;
+    text-decoration: underline;
+  }
+
+  .receipt-body p {
+    margin: 5px 0;
+    font-size: 14px;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  hr {
+    border-top: 1px solid #000;
+    margin: 10px 0;
+  }
+
   .receipt-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
+    margin-top: 20px;
   }
   .receipt-table th,
   .receipt-table td {
-    border: 1px solid #000;
+    border: 1px solid black;
     padding: 8px;
+    text-align: left;
   }
   .text-right {
     text-align: right;
   }
+
   .receipt-footer {
-    margin-top: 50px;
+    margin-top: 60px;
     text-align: right;
+  }
+  .signature p {
+    margin: 5px 0;
   }
 }
 </style>

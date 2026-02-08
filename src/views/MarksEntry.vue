@@ -18,8 +18,7 @@ const filter = ref({
   subject_id: '',
 })
 
-// ✅ অটোমেটিক বেস URL ডিটেকশন (Localhost vs Hosting)
-// যদি লোকালহোস্টে থাকেন তবে ৮০০০ পোর্টে হিট করবে, আর লাইভ সার্ভারে থাকলে রিলেটিভ পাথ (/api) নিবে।
+// অটোমেটিক বেস URL ডিটেকশন
 const BASE_URL =
   window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://127.0.0.1:8000/api'
@@ -66,7 +65,13 @@ const handleClassChange = async () => {
 // ২. স্টুডেন্ট লিস্ট ফেচ করা
 const fetchStudents = async () => {
   if (!filter.value.class_id || !filter.value.section_id) {
-    return Swal.fire('Warning', 'ক্লাস এবং সেকশন সিলেক্ট করুন', 'warning')
+    return Swal.fire({
+      icon: 'warning',
+      title: 'Warning',
+      text: 'Please select class and section.',
+      background: '#1e1e2d',
+      color: '#fff',
+    })
   }
 
   loading.value = true
@@ -80,36 +85,56 @@ const fetchStudents = async () => {
       student_id: student.id,
       name: student.name,
       roll: student.roll_no,
-      obtained_mark: '',
+      obtained_mark: '', // ডিফল্ট খালি
+      image: student.student_profile?.image
+        ? student.student_profile.image.startsWith('http')
+          ? student.student_profile.image
+          : `http://127.0.0.1:8000/storage/${student.student_profile.image}`
+        : null,
     }))
   } catch (error) {
     console.error(error)
-    Swal.fire('Error', 'স্টুডেন্ট লিস্ট আনা যায়নি', 'error')
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Failed to load students.',
+      background: '#1e1e2d',
+      color: '#fff',
+    })
   } finally {
     loading.value = false
   }
 }
 
-// ৩. মার্কস সেভ করা (✅ 422 Error Fix সহ)
+// ৩. মার্কস সেভ করা
 const saveMarks = async () => {
-  // ভ্যালিডেশন
   if (!filter.value.exam_id || !filter.value.subject_id || !filter.value.class_id) {
-    return Swal.fire('Warning', 'অনুগ্রহ করে পরীক্ষা, ক্লাস এবং বিষয় সিলেক্ট করুন', 'warning')
+    return Swal.fire({
+      icon: 'warning',
+      title: 'Warning',
+      text: 'Please select exam, class and subject.',
+      background: '#1e1e2d',
+      color: '#fff',
+    })
   }
 
-  // ১. মার্কস লিস্ট তৈরি
   const marksList = students.value
     .filter((s) => s.obtained_mark !== '' && s.obtained_mark !== null)
     .map((s) => ({
       student_id: s.student_id,
-      marks_obtained: s.obtained_mark, // ✅ কন্ট্রোলারের সাথে মিল রেখে নাম
+      marks_obtained: s.obtained_mark,
     }))
 
   if (marksList.length === 0) {
-    return Swal.fire('Warning', 'কোনো মার্কস দেওয়া হয়নি!', 'warning')
+    return Swal.fire({
+      icon: 'warning',
+      title: 'Warning',
+      text: 'No marks entered.',
+      background: '#1e1e2d',
+      color: '#fff',
+    })
   }
 
-  // ২. সঠিক পে-লোড (আইডিগুলো টপ লেভেলে থাকবে)
   const payload = {
     exam_id: filter.value.exam_id,
     class_id: filter.value.class_id,
@@ -120,19 +145,32 @@ const saveMarks = async () => {
   try {
     await axios.post(`${BASE_URL}/marks`, payload, apiConfig)
 
-    Swal.fire('Success', 'মার্কস সফলভাবে সেভ হয়েছে!', 'success')
-
-    // সফল হলে ইনপুট ফিল্ড ক্লিয়ার করতে চাইলে নিচের লাইনটি চালু করতে পারেন
-    // fetchStudents()
+    Swal.fire({
+      icon: 'success',
+      title: 'Success!',
+      text: 'Marks saved successfully.',
+      background: '#1e1e2d',
+      color: '#fff',
+      confirmButtonColor: '#3b82f6',
+    })
   } catch (error) {
     if (error.response && error.response.status === 422) {
-      // ভ্যালিডেশন এরর দেখা
-      console.log('Validation Error:', error.response.data)
       const errorMsg = Object.values(error.response.data.errors).flat().join('<br>')
-      Swal.fire({ icon: 'error', title: 'Validation Error', html: errorMsg })
+      Swal.fire({
+        icon: 'error',
+        title: 'Validation Error',
+        html: errorMsg,
+        background: '#1e1e2d',
+        color: '#fff',
+      })
     } else {
-      Swal.fire('Error', 'মার্কস সেভ করা যায়নি।', 'error')
-      console.error(error)
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to save marks.',
+        background: '#1e1e2d',
+        color: '#fff',
+      })
     }
   }
 }
@@ -141,178 +179,322 @@ onMounted(loadInitialData)
 </script>
 
 <template>
-  <div class="p-4">
-    <div class="card no-print">
-      <h3>💯 মার্কস এন্ট্রি</h3>
-
-      <div class="filters">
-        <select v-model="filter.exam_id">
-          <option value="">পরীক্ষা সিলেক্ট করুন</option>
-          <option v-for="e in exams" :key="e.id" :value="e.id">{{ e.name }}</option>
-        </select>
-
-        <select v-model="filter.class_id" @change="handleClassChange">
-          <option value="">ক্লাস</option>
-          <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
-
-        <select v-model="filter.section_id">
-          <option value="">সেকশন</option>
-          <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
-        </select>
-
-        <select v-model="filter.subject_id">
-          <option value="">বিষয় (Subject)</option>
-          <option v-for="sub in subjects" :key="sub.id" :value="sub.id">{{ sub.name }}</option>
-        </select>
-
-        <button @click="fetchStudents" class="btn-go">Search</button>
+  <div class="page-container">
+    <div class="header-action">
+      <div>
+        <h2 class="page-title">💯 Marks Entry</h2>
+        <p class="page-subtitle">Input subject-wise marks for students</p>
       </div>
     </div>
 
-    <div v-if="students.length > 0" class="card mt-4">
-      <div class="header-flex">
-        <h4>স্টুডেন্ট তালিকা</h4>
-        <button @click="saveMarks" class="btn-save">💾 সব সেভ করুন</button>
+    <div class="filter-card">
+      <div class="filter-group">
+        <label>Exam</label>
+        <select v-model="filter.exam_id">
+          <option value="">Select Exam</option>
+          <option v-for="e in exams" :key="e.id" :value="e.id">{{ e.name }}</option>
+        </select>
       </div>
 
-      <table class="marks-table">
-        <thead>
-          <tr>
-            <th>রোল</th>
-            <th>নাম</th>
-            <th>প্রাপ্ত নম্বর (Marks)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="student in students" :key="student.student_id">
-            <td>{{ student.roll }}</td>
-            <td>{{ student.name }}</td>
-            <td>
-              <input
-                type="number"
-                v-model="student.obtained_mark"
-                placeholder="Ex: 80"
-                class="mark-input"
-              />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="filter-group">
+        <label>Class</label>
+        <select v-model="filter.class_id" @change="handleClassChange">
+          <option value="">Select Class</option>
+          <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
+        </select>
+      </div>
 
-      <div class="action-area">
-        <button @click="saveMarks" class="btn-save big">💾 মার্কস সাবমিট করুন</button>
+      <div class="filter-group">
+        <label>Section</label>
+        <select v-model="filter.section_id">
+          <option value="">Select Section</option>
+          <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Subject</label>
+        <select v-model="filter.subject_id">
+          <option value="">Select Subject</option>
+          <option v-for="sub in subjects" :key="sub.id" :value="sub.id">{{ sub.name }}</option>
+        </select>
+      </div>
+
+      <button @click="fetchStudents" class="btn search-btn">Search</button>
+    </div>
+
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading student list...</p>
+    </div>
+
+    <div v-else-if="students.length === 0 && filter.section_id" class="empty-state">
+      <p>No students found for this section.</p>
+    </div>
+
+    <div v-else-if="students.length > 0" class="table-card">
+      <div class="table-header">
+        <h4>Student List</h4>
+        <button @click="saveMarks" class="btn save-btn-sm">💾 Save All</button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Roll</th>
+              <th>Student Name</th>
+              <th>Obtained Marks</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="student in students" :key="student.student_id">
+              <td class="roll-col">{{ student.roll }}</td>
+              <td>
+                <div class="user-info">
+                  <div class="avatar-wrapper">
+                    <img v-if="student.image" :src="student.image" class="avatar-img" />
+                    <div v-else class="avatar-placeholder">{{ student.name.charAt(0) }}</div>
+                  </div>
+                  <span class="user-name">{{ student.name }}</span>
+                </div>
+              </td>
+              <td>
+                <input
+                  type="number"
+                  v-model="student.obtained_mark"
+                  placeholder="00"
+                  class="mark-input"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="form-actions">
+        <button @click="saveMarks" class="btn save-btn">💾 Submit Marks</button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* কার্ড স্টাইল */
-.card {
-  background: white !important; /* ব্যাকগ্রাউন্ড সাদা */
+/* Page Layout */
+.page-container {
+  padding: 25px;
+  color: #fff;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.header-action {
+  margin-bottom: 25px;
+}
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+  color: white;
+}
+.page-subtitle {
+  color: #a1a5b7;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+/* Filter Card */
+.filter-card {
+  background: #1e1e2d;
   padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-  color: #333 !important; /* টেক্সট কালো */
-}
-
-/* হেডিং এর রং কালো */
-h3,
-h4 {
-  color: #333 !important;
-}
-
-.filters {
+  border-radius: 12px;
+  margin-bottom: 20px;
   display: flex;
-  gap: 10px;
+  gap: 15px;
+  align-items: flex-end;
   flex-wrap: wrap;
-  margin-top: 15px;
+  border: 1px solid #2b2b40;
 }
-
-/* ইনপুট এবং সিলেক্ট ফিক্স (সাদা ব্যাকগ্রাউন্ড, কালো লেখা) */
-select,
-button,
-input {
+.filter-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 150px;
+}
+.filter-group label {
+  color: #a1a5b7;
+  font-size: 13px;
+  font-weight: 600;
+}
+.filter-group select {
   padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
+  background: #151521;
+  border: 1px solid #2b2b40;
+  border-radius: 8px;
+  color: white;
+  outline: none;
+  width: 100%;
   cursor: pointer;
-  background-color: #ffffff !important;
-  color: #000000 !important;
 }
 
-.btn-go {
-  background: #333 !important; /* সার্চ বাটন কালো */
-  color: white !important;
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
   border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+.search-btn {
+  background: #3b82f6;
+  color: white;
+  height: 42px;
+}
+.search-btn:hover {
+  background: #2563eb;
+}
+.save-btn {
+  background: #10b981;
+  color: white;
+  width: 100%;
+  margin-top: 10px;
+}
+.save-btn:hover {
+  background: #059669;
+}
+.save-btn-sm {
+  background: #10b981;
+  color: white;
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
-.mt-4 {
-  margin-top: 20px;
+/* Table Card */
+.table-card {
+  background: #1e1e2d;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #2b2b40;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
-
-.header-flex {
+.table-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid #2b2b40;
+  background: #151521;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+}
+.table-header h4 {
+  margin: 0;
+  color: #3b82f6;
 }
 
-/* টেবিল ডিজাইন */
-.marks-table {
+.custom-table {
   width: 100%;
   border-collapse: collapse;
-  background-color: white !important;
-}
-
-.marks-table th,
-.marks-table td {
-  border: 1px solid #eee;
-  padding: 10px;
   text-align: left;
-  color: #000000 !important; /* টেবিলের লেখা কালো */
 }
-
-.marks-table th {
-  background: #f8fafc !important;
-  color: #334155 !important;
+.custom-table th {
+  background: #151521;
+  padding: 15px;
+  color: #a1a5b7;
+  font-weight: 600;
+  font-size: 13px;
+  border-bottom: 1px solid #2b2b40;
+}
+.custom-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #2b2b40;
+  color: #e2e8f0;
+  vertical-align: middle;
+}
+.roll-col {
   font-weight: bold;
+  color: #a1a5b7;
+  width: 80px;
+  text-align: center;
 }
 
-/* ইনপুট ফিল্ড ডিজাইন */
+/* User Info */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar-img,
+.avatar-placeholder {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.avatar-placeholder {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+.user-name {
+  font-weight: 600;
+  color: white;
+}
+
+/* Input Field */
 .mark-input {
-  width: 100px;
+  width: 80px;
   padding: 8px;
-  border: 1px solid #cbd5e1;
-  border-radius: 5px;
+  border-radius: 6px;
+  border: 1px solid #2b2b40;
+  background: #151521;
+  color: white;
   text-align: center;
   font-weight: bold;
-  background-color: #fff !important;
-  color: #000 !important;
+  outline: none;
 }
-
 .mark-input:focus {
-  outline: 2px solid #2563eb;
-  border-color: transparent;
+  border-color: #3b82f6;
 }
 
-.btn-save {
-  background: #16a34a !important;
-  color: white !important;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 5px;
+/* Loading & Empty */
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 50px;
+  color: #a1a5b7;
+}
+.spinner {
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
-.btn-save.big {
-  width: 100%;
-  padding: 15px;
-  font-size: 16px;
-  margin-top: 20px;
-}
-
-.action-area {
-  margin-top: 10px;
+/* Responsive */
+@media (max-width: 600px) {
+  .filter-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .table-header {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
 }
 </style>

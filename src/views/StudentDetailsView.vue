@@ -10,12 +10,14 @@ const isLoading = ref(true)
 
 const fetchStudentDetails = async () => {
   try {
+    const token = localStorage.getItem('token')
     const id = route.params.id
-    const response = await axios.get(`http://127.0.0.1:8000/api/students/${id}`)
-    student.value = response.data.data // StudentResource থেকে ডাটা আসবে
+    const response = await axios.get(`http://127.0.0.1:8000/api/students/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    student.value = response.data.data
   } catch (error) {
     console.error('Error fetching details:', error)
-    alert('স্টুডেন্টের তথ্য পাওয়া যায়নি!')
   } finally {
     isLoading.value = false
   }
@@ -27,191 +29,356 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="profile-container">
-    <div class="header">
-      <h2>👤 স্টুডেন্ট প্রোফাইল</h2>
-      <button @click="router.back()" class="back-btn">⬅ ফিরে যান</button>
+  <div class="page-container">
+    <div class="header-action">
+      <div>
+        <h2 class="page-title">👤 Student Profile</h2>
+        <p class="page-subtitle">View detailed information about the student</p>
+      </div>
+      <button @click="router.back()" class="back-btn">
+        <span class="icon">⬅</span> Back to List
+      </button>
     </div>
 
-    <div v-if="isLoading" class="loading">লোড হচ্ছে...</div>
+    <div v-if="isLoading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading profile...</p>
+    </div>
 
     <div v-else-if="student" class="profile-card">
       <div class="profile-header">
-        <img v-if="student.image" :src="student.image" class="profile-img" alt="Student Photo" />
-        <div v-else class="avatar-big">{{ student.name.charAt(0) }}</div>
+        <div class="image-wrapper">
+          <img v-if="student.image" :src="student.image" class="profile-img" alt="Student Photo" />
+          <div v-else class="avatar-placeholder">{{ student.name?.charAt(0) }}</div>
+        </div>
 
         <div class="user-meta">
-          <h3>{{ student.name }}</h3>
+          <h3 class="user-name">{{ student.name }}</h3>
+          <p class="user-email">{{ student.email }}</p>
+          <div class="status-badge">Active Student</div>
+        </div>
+
+        <div class="header-actions">
+          <button @click="router.push(`/admin/students/edit/${student.id}`)" class="edit-btn">
+            ✏️ Edit Profile
+          </button>
+          <button @click="router.push(`/admin/students/id-card/${student.id}`)" class="id-btn">
+            🆔 ID Card
+          </button>
         </div>
       </div>
 
-      <div class="details-grid">
-        <div class="detail-item">
-          <label>ইমেইল:</label>
-          <span>{{ student.email }}</span>
-        </div>
-        <div class="detail-item">
-          <label>অ্যাডমিশন নং:</label>
-          <span>{{ student.admission_no }}</span>
-        </div>
-        <div class="detail-item">
-          <label>রোল নং:</label>
-          <span>{{ student.roll_no }}</span>
-        </div>
-        <div class="detail-item">
-          <label>ক্লাস:</label>
-          <span class="badge">{{ student.class }}</span>
-        </div>
-        <div class="detail-item">
-          <label>সেকশন:</label>
-          <span class="badge">{{ student.section }}</span>
-        </div>
-        <div class="detail-item">
-          <label>লিঙ্গ:</label>
-          <span>{{ student.gender }}</span>
-        </div>
-        <div class="detail-item">
-          <label>জন্ম তারিখ:</label>
-          <span>{{ student.dob }}</span>
-        </div>
-        <div class="detail-item full">
-          <label>বর্তমান ঠিকানা:</label>
-          <span>{{ student.address }}</span>
-        </div>
-        <div class="detail-item">
-          <label>ফোন নম্বর:</label>
-          <span>{{ student.phone || 'N/A' }}</span>
-        </div>
-        <div class="detail-item">
-          <label>রক্তের গ্রুপ:</label>
-          <span class="blood-badge">{{ student.blood_group || 'N/A' }}</span>
-        </div>
-      </div>
+      <div class="divider"></div>
 
-      <div class="actions">
-        <button @click="router.push(`/admin/students/edit/${student.id}`)" class="edit-btn">
-          ✏️ তথ্য সংশোধন
-        </button>
+      <div class="details-section">
+        <h4 class="section-title">📝 Academic Information</h4>
+        <div class="grid-container">
+          <div class="detail-item">
+            <label>Admission No</label>
+            <span class="highlight">{{ student.admission_no }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Roll Number</label>
+            <span class="highlight">{{ student.roll_no }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Class</label>
+            <span class="badge blue">{{ student.class }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Section</label>
+            <span class="badge purple">{{ student.section }}</span>
+          </div>
+        </div>
+
+        <h4 class="section-title mt-4">👤 Personal Information</h4>
+        <div class="grid-container">
+          <div class="detail-item">
+            <label>Gender</label>
+            <span>{{ student.gender }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Date of Birth</label>
+            <span>{{ student.dob }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Phone Number</label>
+            <span>{{ student.phone || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Blood Group</label>
+            <span class="blood-badge">{{ student.blood_group || 'N/A' }}</span>
+          </div>
+          <div class="detail-item full-width">
+            <label>Present Address</label>
+            <span class="address-text">{{ student.address }}</span>
+          </div>
+        </div>
       </div>
+    </div>
+
+    <div v-else class="error-state">
+      <p>⚠️ Student information not found!</p>
     </div>
   </div>
 </template>
 
 <style scoped>
-.profile-container {
-  max-width: 800px;
+/* Page Layout */
+.page-container {
+  padding: 25px;
+  color: #fff;
+  max-width: 900px;
   margin: 0 auto;
 }
-.header {
+.header-action {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
-.back-btn {
-  background: #f1f5f9;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 6px;
-  cursor: pointer;
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+  color: white;
+}
+.page-subtitle {
+  color: #a1a5b7;
+  font-size: 14px;
+  margin-top: 5px;
 }
 
-.profile-card {
-  background: white;
-  border-radius: 15px;
-  padding: 30px;
-  shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e2e8f0;
+/* Back Button */
+.back-btn {
+  background: #2b2b40;
+  color: #a1a5b7;
+  border: 1px solid #323248;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.3s;
 }
+.back-btn:hover {
+  background: #323248;
+  color: white;
+}
+
+/* Profile Card */
+.profile-card {
+  background: #1e1e2d;
+  border-radius: 12px;
+  border: 1px solid #2b2b40;
+  overflow: hidden;
+}
+
+/* Header Section */
 .profile-header {
   display: flex;
   align-items: center;
-  gap: 20px;
-  border-bottom: 2px solid #f1f5f9;
-  padding-bottom: 20px;
-  margin-bottom: 20px;
+  gap: 25px;
+  padding: 30px;
+  background: #151521;
 }
-.avatar-big {
-  width: 80px;
-  height: 80px;
-  background: #3b82f6;
+.image-wrapper {
+  position: relative;
+}
+.profile-img {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #3b82f6;
+}
+.avatar-placeholder {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 40px;
   font-weight: bold;
+  border: 3px solid #2b2b40;
 }
-.user-meta h3 {
+.user-meta {
+  flex: 1;
+}
+.user-name {
+  font-size: 24px;
   margin: 0;
-  font-size: 1.5rem;
-  color: #1e293b;
+  color: white;
+  font-weight: 700;
 }
-.role-badge {
-  background: #dcfce7;
-  color: #166534;
-  padding: 2px 10px;
-  border-radius: 20px;
-  font-size: 0.8rem;
+.user-email {
+  color: #a1a5b7;
+  margin: 5px 0 10px;
+  font-size: 14px;
+}
+.status-badge {
   display: inline-block;
-  margin-top: 5px;
-}
-
-.details-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-.detail-item {
-  display: flex;
-  flex-direction: column;
-}
-.detail-item label {
-  font-size: 0.85rem;
-  color: #64748b;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
   font-weight: 600;
 }
-.detail-item span {
-  color: #1e293b;
-  font-weight: 500;
-  margin-top: 5px;
-}
-.badge {
-  background: #f1f5f9;
-  padding: 4px 8px;
-  border-radius: 4px;
-  display: inline-block;
-}
-.full {
-  grid-column: span 2;
-}
 
-.actions {
-  margin-top: 30px;
-  text-align: right;
+/* Header Actions */
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+.edit-btn,
+.id-btn {
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: 0.3s;
 }
 .edit-btn {
   background: #3b82f6;
   color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
+}
+.edit-btn:hover {
+  background: #2563eb;
+}
+.id-btn {
+  background: #2b2b40;
+  color: #a1a5b7;
+  border: 1px solid #323248;
+}
+.id-btn:hover {
+  background: #323248;
+  color: white;
+}
+
+.divider {
+  height: 1px;
+  background: #2b2b40;
+  width: 100%;
+}
+
+/* Details Section */
+.details-section {
+  padding: 30px;
+}
+.section-title {
+  font-size: 16px;
+  color: #3b82f6;
+  margin-bottom: 20px;
+  font-weight: 700;
+  border-bottom: 1px solid #2b2b40;
+  padding-bottom: 10px;
+}
+.mt-4 {
+  margin-top: 30px;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 25px;
+}
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.full-width {
+  grid-column: span 2;
+}
+
+.detail-item label {
+  font-size: 12px;
+  color: #a1a5b7;
   font-weight: 600;
-  .profile-img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid #e2e8f0;
+  text-transform: uppercase;
+}
+.detail-item span {
+  font-size: 15px;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+.address-text {
+  line-height: 1.6;
+}
+
+/* Badges */
+.highlight {
+  font-weight: 700;
+  color: white;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+}
+.badge {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-block;
+  width: fit-content;
+}
+.badge.blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+.badge.purple {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+}
+.blood-badge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: bold;
+  width: fit-content;
+}
+
+/* Loading */
+.loading-state,
+.error-state {
+  text-align: center;
+  padding: 50px;
+  color: #a1a5b7;
+}
+.spinner {
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
   }
-  .blood-badge {
-    color: #dc2626;
-    font-weight: bold;
-    background: #fee2e2;
-    padding: 2px 8px;
-    border-radius: 4px;
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .profile-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  .grid-container {
+    grid-template-columns: 1fr;
+  }
+  .header-actions {
+    justify-content: center;
   }
 }
 </style>
